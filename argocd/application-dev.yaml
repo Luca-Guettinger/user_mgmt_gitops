@@ -1,0 +1,29 @@
+# Same chart, dev values, its own namespace. Not applied by default -
+# apply it when a dev environment is wanted alongside prod.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: user-mgmt-dev
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: user-mgmt
+  source:
+    repoURL: https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+    targetRevision: main
+    path: charts/user-mgmt
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-dev.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: user-mgmt-dev
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true

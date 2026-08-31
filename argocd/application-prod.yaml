@@ -1,0 +1,40 @@
+# ArgoCD watches this Git repo and keeps namespace "user-mgmt" in sync with
+# charts/user-mgmt rendered with values.yaml + values-prod.yaml.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: user-mgmt-prod
+  # The Application object itself lives in ArgoCD's namespace...
+  namespace: argocd
+  finalizers:
+    # ...and deleting it cleans up the resources it created.
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: user-mgmt
+  source:
+    repoURL: https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+    targetRevision: main
+    path: charts/user-mgmt
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-prod.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    # ...while the app is deployed into its own namespace, separate from argocd.
+    namespace: user-mgmt
+  syncPolicy:
+    automated:
+      # Delete resources that were removed from Git.
+      prune: true
+      # Revert manual changes made directly in the cluster.
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

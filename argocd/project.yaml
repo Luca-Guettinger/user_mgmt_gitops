@@ -1,0 +1,24 @@
+# One ArgoCD project for this application. Restricting the project to the
+# namespaces the app is allowed to touch keeps future environments contained.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: user-mgmt
+  namespace: argocd
+spec:
+  description: User Management Service (GitOps)
+  sourceRepos:
+    - https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: user-mgmt
+    - server: https://kubernetes.default.svc
+      namespace: user-mgmt-*
+  # Namespaced resources: allow everything inside those namespaces.
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  # Cluster-scoped resources: only the cert-manager ClusterIssuer.
+  clusterResourceWhitelist:
+    - group: cert-manager.io
+      kind: ClusterIssuer
