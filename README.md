@@ -144,7 +144,17 @@ argocd repo add https://github.com/Luca-Guettinger/user_mgmt_gitops.git \
 
 ### Step 2 — install the nginx ingress controller
 
-This makes DigitalOcean provision a Load Balancer with a public IP (~12 USD/month).
+This makes DigitalOcean provision a Load Balancer with a public IP (~12 USD/month, covered by
+the 200 USD / 60-day trial credit).
+
+> **Don't try to skip the Load Balancer with `hostPort`.** DOKS worker nodes sit behind a
+> DigitalOcean-managed firewall that only opens the NodePort range 30000-32767. Ports 80 and
+> 443 are silently dropped (connection *times out*, it is not refused), so an ingress
+> controller on `hostPort: 80` is unreachable from the internet — and without port 80 the
+> Let's Encrypt HTTP-01 challenge cannot complete either. Verified by probing a node directly:
+> port 30300 answered, ports 80/443 timed out. The only free workaround is adding an inbound
+> rule for 80/443 to the auto-created `k8s-<cluster-id>` firewall, which DigitalOcean may
+> reconcile away again.
 
 ```bash
 kubectl apply -f https://raw.githubusercontent.com/kubernetes/ingress-nginx/controller-v1.11.3/deploy/static/provider/cloud/deploy.yaml
