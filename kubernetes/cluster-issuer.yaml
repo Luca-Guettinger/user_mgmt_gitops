@@ -1,0 +1,18 @@
+# Tells cert-manager how to get Let's Encrypt certs.
+# With a LoadBalancer, port 80 is reachable, so we use the simple HTTP-01 challenge:
+# Let's Encrypt fetches a token over http://kube.nightnode.io/.well-known/acme-challenge/...
+# which the ingress controller serves. No DNS API, no OVH webhook, no credentials needed.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: letsencrypt-prod
+spec:
+  acme:
+    server: https://acme-v02.api.letsencrypt.org/directory
+    email: martin@hoechli.net           # Let's Encrypt account / expiry notices
+    privateKeySecretRef:
+      name: letsencrypt-prod-account-key
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: nginx

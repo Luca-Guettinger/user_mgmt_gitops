@@ -1,0 +1,40 @@
+# Routing + TLS for the app. Replaces the old traefik/dynamic.yml.
+#   /backend/*  -> backend service  (with the /backend prefix stripped)
+#   /*          -> frontend service
+# TLS cert is requested automatically by cert-manager (see cluster-issuer.yaml).
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: app
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    # Regex capture in the paths below -> $2 is everything after the prefix.
+    # This is how we strip "/backend" (equivalent to traefik's stripPrefix).
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - kube.nightnode.io
+      secretName: kube-nightnode-tls   # cert-manager fills this in
+  rules:
+    - host: kube.nightnode.io
+      http:
+        paths:
+          # backend first (longer, more specific path wins)
+          - path: /backend(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: backend
+                port:
+                  number: 8080
+          # everything else -> frontend
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: frontend
+                port:
+                  number: 3000

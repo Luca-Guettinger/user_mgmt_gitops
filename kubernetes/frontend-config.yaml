@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: frontend-config
+data:
+  HOSTNAME: "0.0.0.0"
+  PORT: "3000"
+  # NOTE: NEXT_PUBLIC_* is baked into the auth-portal image at BUILD time.
+  # Changing it here alone is NOT enough — the image must be rebuilt with this value.
+  NEXT_PUBLIC_API_URL: "https://kube.nightnode.io/backend"

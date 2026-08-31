@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: backend
+  template:
+    metadata:
+      labels:
+        app: backend
+    spec:
+      containers:
+        - name: backend
+          image: ghcr.io/luca-guettinger/user-mgmt-backend:latest
+          ports:
+            - containerPort: 8080
+          envFrom:
+            - configMapRef:
+                name: postgres-config   # SPRING_DATASOURCE_URL
+            - secretRef:
+                name: postgres-secret   # SPRING_DATASOURCE_USERNAME / _PASSWORD
+            - configMapRef:
+                name: backend-config    # JWT_ISSUER, JWT_EXPIRATION_MILLIS, DDL_AUTO
+            - secretRef:
+                name: backend-secret    # JWT_SECRET
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: backend
+  labels:
+    app: backend
+spec:
+  type: NodePort
+  selector:
+    app: backend
+  ports:
+    - port: 8080
+      targetPort: 8080
+      nodePort: 30080
