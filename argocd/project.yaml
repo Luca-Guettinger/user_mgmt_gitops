@@ -18,7 +18,10 @@ spec:
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'
-  # Cluster-scoped resources: only the cert-manager ClusterIssuer.
+  # Cluster-scoped resources: the target Namespace (CreateNamespace=true in the
+  # Application makes ArgoCD create it) and the cert-manager ClusterIssuer.
   clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
     - group: cert-manager.io
       kind: ClusterIssuer
