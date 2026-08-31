@@ -97,6 +97,9 @@ postgres:
     storageClass: ""
     accessMode: ReadWriteOnce
     size: 8Gi
+    # Keep the volume when the release is uninstalled. Handy for real data,
+    # but a kept volume keeps costing money after the cluster is gone.
+    keepOnDelete: false
     mountPath: /var/lib/postgresql/data
     # Postgres refuses to start on a volume root that contains lost+found,
     # so the data directory lives in a subdirectory of the volume.

@@ -14,11 +14,27 @@ backend:
   # Reachable only through the ingress.
   service:
     type: ClusterIP
+  config:
+    # Cap the JVM heap so backend + frontend + postgres + argocd all fit on a
+    # single 2 GB node (the cheapest size DOKS offers).
+    JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=128m"
+  resources:
+    requests:
+      cpu: 100m
+      memory: 384Mi
+    limits:
+      memory: 640Mi
 
 frontend:
   replicaCount: 1
   service:
     type: ClusterIP
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
   config:
     # Baked into the Next.js image at build time - rebuild the image when
     # this changes.
@@ -30,9 +46,20 @@ postgres:
     password: change-me
   persistence:
     enabled: true
-    size: 8Gi
-    # DigitalOcean block storage, Retain so the volume survives a delete.
-    storageClass: do-block-storage-retain
+    # Block storage is billed at 0.10 USD per GiB per month. The database for
+    # this app is tiny, so 1 GiB (the minimum) is plenty.
+    size: 1Gi
+    # Plain do-block-storage has reclaimPolicy Delete: removing the PVC also
+    # removes the volume, so nothing keeps billing after the cluster is gone.
+    # Switch to do-block-storage-retain (+ keepOnDelete: true) for real data.
+    storageClass: do-block-storage
+    keepOnDelete: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      memory: 256Mi
 
 ingress:
   enabled: true

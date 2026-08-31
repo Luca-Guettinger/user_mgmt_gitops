@@ -126,6 +126,24 @@ namespace user-mgmt-dev   optional second environment, same chart
 Prerequisites: `kubectl` pointed at the cluster (`kubectl config current-context` →
 `do-fra1-kube`) and `helm` installed. ArgoCD already runs in the `argocd` namespace.
 
+### Step 0 — create the cluster
+
+The cheapest node size DOKS offers is `s-1vcpu-2gb` (12 USD/month). `values-prod.yaml` sets
+resource limits and caps the JVM heap so the whole app plus ArgoCD fits on one such node.
+**Do not enable the HA control plane** — the standard control plane is free, HA costs 40
+USD/month.
+
+```bash
+doctl kubernetes cluster create teko-kube   --region fra1 --version latest   --node-pool "name=pool;size=s-1vcpu-2gb;count=1" --wait
+```
+
+RAM is tight on 2 GB. ArgoCD ships three components this setup does not use — scale them to
+zero right after installing it:
+
+```bash
+kubectl -n argocd scale deploy/argocd-dex-server   deploy/argocd-applicationset-controller   deploy/argocd-notifications-controller --replicas=0
+```
+
 ### Step 1 — push this repo to GitHub
 
 ArgoCD can only read the chart from a Git URL, so this has to exist first.
@@ -269,3 +287,51 @@ helm upgrade --install user-mgmt charts/user-mgmt \
 
 Locally on kind: `kind create cluster --config local/kind-cluster.yaml`, then the same command
 with `values-dev.yaml` and `-n user-mgmt-dev`.
+
+---
+
+## 7. What this costs
+
+The control plane is free; you pay for the worker node, the Load Balancer and the volume.
+
+| Item | Price | Note |
+|---|---|---|
+| Worker node `s-1vcpu-2gb` | 12 USD/month | cheapest size DOKS offers |
+| Load Balancer | 12 USD/month | created by the ingress-nginx install |
+| Block storage (PVC) | 0.10 USD/GiB/month | `values-prod.yaml` asks for 1 GiB |
+| Bandwidth | 0 USD | 2000 GiB per node included |
+| Container registry | 0 USD | images live on GHCR, not DOCR |
+
+**Total: about 24 USD/month.** Avoid the two expensive extras: the HA control plane
+(+40 USD/month) and a DigitalOcean Container Registry (not needed).
+
+Everything is billed **hourly and prorated**, so a cluster that only runs while you work on it
+costs very little — roughly 0.80 USD per day, 5.60 USD per week. Tear it down when you are done:
+
+```bash
+doctl kubernetes cluster delete teko-kube
+# The Load Balancer is not always removed with the cluster - check and delete it,
+# otherwise it keeps billing 12 USD/month:
+doctl compute load-balancer list
+```
+
+`values-prod.yaml` deliberately uses `storageClass: do-block-storage` (reclaim policy
+*Delete*) and `keepOnDelete: false`, so the volume disappears with the PVC instead of becoming
+an orphan that keeps costing money. For data you actually want to survive, switch to
+`do-block-storage-retain` and `keepOnDelete: true` — and then remember to delete the volume
+by hand.
+
+### Running without the Load Balancer (about 12 USD/month)
+
+Add an inbound rule for TCP 80 and 443 to the auto-created `k8s-<cluster-id>` firewall in the
+DigitalOcean control panel, then install ingress-nginx with `hostPort` instead of a
+LoadBalancer Service:
+
+```bash
+helm repo add ingress-nginx https://kubernetes.github.io/ingress-nginx
+helm install ingress-nginx ingress-nginx/ingress-nginx   -n ingress-nginx --create-namespace   --set controller.kind=DaemonSet   --set controller.service.type=ClusterIP   --set controller.hostPort.enabled=true
+```
+
+Point DNS at the node's public IP instead of the Load Balancer IP. Nothing in the chart
+changes. The catch: that firewall is managed by DigitalOcean and the rule can be reconciled
+away (for example on a node-pool upgrade), which takes the app offline until you re-add it.

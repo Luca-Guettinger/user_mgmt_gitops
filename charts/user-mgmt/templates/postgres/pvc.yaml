@@ -7,9 +7,11 @@ metadata:
   namespace: {{ include "user-mgmt.namespace" . }}
   labels:
     {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+  {{- if .Values.postgres.persistence.keepOnDelete }}
   annotations:
     # Keep the volume (and the data on it) when the release is uninstalled.
     helm.sh/resource-policy: keep
+  {{- end }}
 spec:
   accessModes:
     - {{ .Values.postgres.persistence.accessMode }}
