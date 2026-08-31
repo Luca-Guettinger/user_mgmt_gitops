@@ -1,4 +1,4 @@
-# TLS setup (LoadBalancer route → `https://kube.nightnode.io`)
+# TLS setup (LoadBalancer route → `https://vsc.notenverwaltung.ch`)
 
 Clean URL, real ports 80/443, simple HTTP-01 certs. Costs ~$12/month for the DO
 Load Balancer (auto-provisioned when the ingress controller is installed).
@@ -16,7 +16,7 @@ credentials — that whole layer is gone.
 |---|---|
 | `ingress.yaml` | Routing + TLS (replaces old `traefik/dynamic.yml`) |
 | `cluster-issuer.yaml` | How cert-manager gets the cert (HTTP-01) |
-| `frontend-config.yaml` | `NEXT_PUBLIC_API_URL` = `https://kube.nightnode.io/backend` (⚠️ needs image rebuild) |
+| `frontend-config.yaml` | `NEXT_PUBLIC_API_URL` = `https://vsc.notenverwaltung.ch/backend` (⚠️ needs image rebuild) |
 
 ---
 
@@ -47,18 +47,18 @@ Add an A record for the `kube` subdomain pointing at the LB IP from step 2:
 
 ### 6. Rebuild the frontend image  ⚠️ important
 `NEXT_PUBLIC_API_URL` is baked in at **build time** for Next.js. Rebuild & push the
-`auth-portal` image with `NEXT_PUBLIC_API_URL=https://kube.nightnode.io/backend`, then:
+`auth-portal` image with `NEXT_PUBLIC_API_URL=https://vsc.notenverwaltung.ch/backend`, then:
 
     kubectl apply -f kubernetes/frontend-config.yaml
     kubectl rollout restart deploy/frontend
 
 ### 7. Watch the cert get issued (a minute or two after DNS resolves)
     kubectl get certificate
-    kubectl describe certificate kube-nightnode-tls
+    kubectl describe certificate vsc-notenverwaltung-tls
     # READY=True means the cert is live
 
 ### 8. Test
-    https://kube.nightnode.io
+    https://vsc.notenverwaltung.ch
 
 ---
 

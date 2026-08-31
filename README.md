@@ -181,7 +181,21 @@ kubectl -n ingress-nginx get svc ingress-nginx-controller -w    # wait for EXTER
 
 ### Step 3 — point DNS at that IP
 
-At OVH add an A record: name `kube`, value `<EXTERNAL-IP>`, TTL 300.
+The domain is on Cloudflare. **DNS → Records → Add record:**
+
+| Field | Value |
+|---|---|
+| Type | `A` |
+| Name | `vsc` |
+| IPv4 address | the Load Balancer `EXTERNAL-IP` from step 2 |
+| Proxy status | **DNS only** (grey cloud) |
+| TTL | Auto |
+
+The grey cloud matters. With the proxy enabled, Cloudflare's *Always Use HTTPS* redirects the
+ACME HTTP-01 challenge to https before a certificate exists, so cert-manager never gets one;
+and SSL mode *Flexible* plus the ingress controller's own HTTPS redirect produces a redirect
+loop. Turn the proxy on only after the certificate has been issued, and then set the SSL/TLS
+mode to *Full (strict)*, never *Flexible*.
 
 ### Step 4 — install cert-manager
 
@@ -207,7 +221,7 @@ deploy — that value is what initialises the database.
 the ConfigMap alone does nothing. In the `user_mgmt_service` repo:
 
 ```bash
-docker build --build-arg NEXT_PUBLIC_API_URL=https://kube.nightnode.io/backend \
+docker build --build-arg NEXT_PUBLIC_API_URL=https://vsc.notenverwaltung.ch/backend \
   -t ghcr.io/luca-guettinger/auth-portal:latest ./auth_portal-main
 docker push ghcr.io/luca-guettinger/auth-portal:latest
 ```
@@ -243,7 +257,7 @@ The old Postgres had no volume, so there is no data to migrate.
 
 ### Step 9 — open the app
 
-<https://kube.nightnode.io>
+<https://vsc.notenverwaltung.ch>
 
 ---
 

@@ -38,7 +38,7 @@ frontend:
   config:
     # Baked into the Next.js image at build time - rebuild the image when
     # this changes.
-    NEXT_PUBLIC_API_URL: https://kube.nightnode.io/backend
+    NEXT_PUBLIC_API_URL: https://vsc.notenverwaltung.ch/backend
 
 postgres:
   auth:
@@ -64,10 +64,10 @@ postgres:
 ingress:
   enabled: true
   className: nginx
-  host: kube.nightnode.io
+  host: vsc.notenverwaltung.ch
   tls:
     enabled: true
-    secretName: kube-nightnode-tls
+    secretName: vsc-notenverwaltung-tls
     clusterIssuer: letsencrypt-prod
 
 certManager:
