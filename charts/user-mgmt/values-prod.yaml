@@ -21,7 +21,10 @@ backend:
   resources:
     requests:
       cpu: 100m
-      memory: 384Mi
+      # Deliberately below what the JVM actually uses: this only reserves
+      # scheduling room. 384Mi filled the 2 GB node and left no space for the
+      # postgres pod. The limit below is what actually caps the container.
+      memory: 224Mi
     limits:
       memory: 640Mi
 
@@ -43,7 +46,7 @@ frontend:
 postgres:
   auth:
     # TODO: replace with a real secret (Sealed Secrets / SOPS / External Secrets).
-    password: change-me
+    password: aed8e71486da7ef9ad8322c362a6279e
   persistence:
     enabled: true
     # Block storage is billed at 0.10 USD per GiB per month. The database for
@@ -73,4 +76,4 @@ ingress:
 certManager:
   clusterIssuer:
     create: true
-    email: luca.guettinger@cmi.ch
+    email: martin@hoechli.net
