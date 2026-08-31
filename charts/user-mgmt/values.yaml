@@ -45,7 +45,9 @@ backend:
     SPRING_JPA_HIBERNATE_DDL_AUTO: update
   # Sensitive configuration -> rendered into a Secret.
   secrets:
-    JWT_SECRET: change-me-to-a-long-random-secret
+    # Must be valid Base64: the backend does Decoders.BASE64.decode() on this
+    # value and hands the bytes to Keys.hmacShaKeyFor (64 bytes -> HS512).
+    JWT_SECRET: MvPBBahI529jCRYlxdT6r1Mqb9Fen/OBnZ7OdRwO9qf5pYtIe3yZxpzSHD0r1NENECGN6L2ueHBdQsNyqIxemg==
   resources: {}
   probes:
     enabled: false
