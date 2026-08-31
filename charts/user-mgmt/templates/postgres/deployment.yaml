@@ -1,0 +1,59 @@
+{{- if .Values.postgres.enabled }}
+{{- $ctx := dict "root" . "component" "postgres" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  replicas: 1
+  {{- if .Values.postgres.persistence.enabled }}
+  # A ReadWriteOnce volume can only be attached to one node at a time, so the
+  # old pod has to be gone before the new one starts.
+  strategy:
+    type: Recreate
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "user-mgmt.labels" $ctx | nindent 8 }}
+    spec:
+      containers:
+        - name: postgres
+          image: {{ include "user-mgmt.image" (dict "root" . "image" .Values.postgres.image) }}
+          imagePullPolicy: {{ include "user-mgmt.imagePullPolicy" (dict "root" . "image" .Values.postgres.image) }}
+          ports:
+            - name: postgres
+              containerPort: {{ .Values.postgres.containerPort }}
+          env:
+            {{- include "user-mgmt.dbCredentialEnv" (dict "root" . "userVar" "POSTGRES_USER" "passwordVar" "POSTGRES_PASSWORD") | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "user-mgmt.componentName" $ctx }}
+          readinessProbe:
+            exec:
+              command: ["sh", "-c", "pg_isready -U $POSTGRES_USER -d $POSTGRES_DB"]
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          {{- with .Values.postgres.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+          {{- if .Values.postgres.persistence.enabled }}
+          volumeMounts:
+            - name: data
+              mountPath: {{ .Values.postgres.persistence.mountPath }}
+              subPath: {{ .Values.postgres.persistence.subPath }}
+          {{- end }}
+      {{- if .Values.postgres.persistence.enabled }}
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ include "user-mgmt.componentName" $ctx }}-data
+      {{- end }}
+{{- end }}

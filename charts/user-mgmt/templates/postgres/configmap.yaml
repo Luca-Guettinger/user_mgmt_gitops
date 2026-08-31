@@ -1,0 +1,12 @@
+{{- if .Values.postgres.enabled }}
+{{- $ctx := dict "root" . "component" "postgres" }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+data:
+  POSTGRES_DB: {{ .Values.postgres.auth.database | quote }}
+{{- end }}

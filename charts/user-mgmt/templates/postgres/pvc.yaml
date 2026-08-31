@@ -1,0 +1,22 @@
+{{- if and .Values.postgres.enabled .Values.postgres.persistence.enabled }}
+{{- $ctx := dict "root" . "component" "postgres" }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}-data
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+  annotations:
+    # Keep the volume (and the data on it) when the release is uninstalled.
+    helm.sh/resource-policy: keep
+spec:
+  accessModes:
+    - {{ .Values.postgres.persistence.accessMode }}
+  resources:
+    requests:
+      storage: {{ .Values.postgres.persistence.size }}
+  {{- with .Values.postgres.persistence.storageClass }}
+  storageClassName: {{ . }}
+  {{- end }}
+{{- end }}

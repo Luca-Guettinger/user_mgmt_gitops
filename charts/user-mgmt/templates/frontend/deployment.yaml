@@ -1,0 +1,36 @@
+{{- if .Values.frontend.enabled }}
+{{- $ctx := dict "root" . "component" "frontend" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.frontend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "user-mgmt.labels" $ctx | nindent 8 }}
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/frontend/configmap.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: frontend
+          image: {{ include "user-mgmt.image" (dict "root" . "image" .Values.frontend.image) }}
+          imagePullPolicy: {{ include "user-mgmt.imagePullPolicy" (dict "root" . "image" .Values.frontend.image) }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.frontend.containerPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "user-mgmt.componentName" $ctx }}
+          {{- with .Values.frontend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

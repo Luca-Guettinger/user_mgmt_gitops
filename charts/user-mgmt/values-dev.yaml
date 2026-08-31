@@ -1,0 +1,39 @@
+# ---------------------------------------------------------------------------
+# Environment: dev (local kind cluster)
+# Only the values that differ from values.yaml.
+# Deployed into namespace: user-mgmt-dev
+# ---------------------------------------------------------------------------
+
+global:
+  imageTag: latest
+  imagePullPolicy: Always
+  labels:
+    environment: dev
+
+backend:
+  service:
+    type: NodePort
+    nodePort: 30080
+
+frontend:
+  service:
+    type: NodePort
+    nodePort: 30300
+  config:
+    NEXT_PUBLIC_API_URL: http://localhost:30080
+
+postgres:
+  auth:
+    password: dev-password
+  persistence:
+    enabled: true
+    size: 1Gi
+    # kind's default provisioner (local-path / standard)
+    storageClass: standard
+
+ingress:
+  enabled: false
+
+certManager:
+  clusterIssuer:
+    create: false

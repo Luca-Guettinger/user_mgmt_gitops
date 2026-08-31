@@ -1,0 +1,52 @@
+{{- if .Values.ingress.enabled }}
+{{- $ctx := dict "root" . "component" "ingress" }}
+{{- $backend := include "user-mgmt.componentName" (dict "root" . "component" "backend") }}
+{{- $frontend := include "user-mgmt.componentName" (dict "root" . "component" "frontend") }}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+  annotations:
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+    {{- if .Values.ingress.tls.enabled }}
+    cert-manager.io/cluster-issuer: {{ .Values.ingress.tls.clusterIssuer }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.ingress.className }}
+  {{- if .Values.ingress.tls.enabled }}
+  tls:
+    - hosts:
+        - {{ .Values.ingress.host }}
+      secretName: {{ .Values.ingress.tls.secretName }}
+  {{- end }}
+  rules:
+    - host: {{ .Values.ingress.host }}
+      http:
+        paths:
+          {{- if .Values.backend.enabled }}
+          # More specific path first: /backend/* -> backend, prefix stripped
+          # by the rewrite-target annotation ($2 is everything after it).
+          - path: {{ printf "%s(/|$)(.*)" .Values.ingress.backendPathPrefix }}
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $backend }}
+                port:
+                  number: {{ .Values.backend.service.port }}
+          {{- end }}
+          {{- if .Values.frontend.enabled }}
+          # Everything else -> frontend.
+          - path: /()(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ $frontend }}
+                port:
+                  number: {{ .Values.frontend.service.port }}
+          {{- end }}
+{{- end }}

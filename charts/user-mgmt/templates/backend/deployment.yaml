@@ -1,0 +1,50 @@
+{{- if .Values.backend.enabled }}
+{{- $ctx := dict "root" . "component" "backend" }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.backend.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "user-mgmt.labels" $ctx | nindent 8 }}
+      annotations:
+        # Roll the pods automatically when config or secrets change.
+        checksum/config: {{ include (print $.Template.BasePath "/backend/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/backend/secret.yaml") . | sha256sum }}
+    spec:
+      containers:
+        - name: backend
+          image: {{ include "user-mgmt.image" (dict "root" . "image" .Values.backend.image) }}
+          imagePullPolicy: {{ include "user-mgmt.imagePullPolicy" (dict "root" . "image" .Values.backend.image) }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.backend.containerPort }}
+          env:
+            {{- include "user-mgmt.dbCredentialEnv" (dict "root" . "userVar" "SPRING_DATASOURCE_USERNAME" "passwordVar" "SPRING_DATASOURCE_PASSWORD") | nindent 12 }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "user-mgmt.componentName" $ctx }}
+            - secretRef:
+                name: {{ include "user-mgmt.componentName" $ctx }}
+          {{- if .Values.backend.probes.enabled }}
+          readinessProbe:
+            httpGet:
+              path: {{ .Values.backend.probes.path }}
+              port: http
+            initialDelaySeconds: {{ .Values.backend.probes.initialDelaySeconds }}
+            periodSeconds: {{ .Values.backend.probes.periodSeconds }}
+          {{- end }}
+          {{- with .Values.backend.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

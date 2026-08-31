@@ -1,0 +1,22 @@
+{{- if .Values.certManager.clusterIssuer.create }}
+{{- $ctx := dict "root" . "component" "cert-manager" }}
+# Tells cert-manager how to obtain Let's Encrypt certificates.
+# The ingress controller's LoadBalancer exposes port 80, so the simple
+# HTTP-01 challenge works - no DNS API credentials needed.
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.certManager.clusterIssuer.name }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  acme:
+    server: {{ .Values.certManager.clusterIssuer.server }}
+    email: {{ .Values.certManager.clusterIssuer.email }}
+    privateKeySecretRef:
+      name: {{ .Values.certManager.clusterIssuer.privateKeySecretName }}
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ .Values.ingress.className }}
+{{- end }}

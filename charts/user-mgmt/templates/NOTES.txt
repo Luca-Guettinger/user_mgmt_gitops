@@ -1,0 +1,12 @@
+{{ include "user-mgmt.fullname" . }} deployed to namespace {{ .Release.Namespace }}.
+
+{{ if .Values.ingress.enabled -}}
+Frontend:  http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}
+Backend:   http{{ if .Values.ingress.tls.enabled }}s{{ end }}://{{ .Values.ingress.host }}{{ .Values.ingress.backendPathPrefix }}
+{{- else -}}
+No ingress enabled. Reach the frontend with a port-forward:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "user-mgmt.componentName" (dict "root" . "component" "frontend") }} 3000:{{ .Values.frontend.service.port }}
+{{- end }}
+
+Database persistence: {{ if .Values.postgres.persistence.enabled }}PVC {{ include "user-mgmt.componentName" (dict "root" . "component" "postgres") }}-data ({{ .Values.postgres.persistence.size }}){{ else }}DISABLED - data is lost on pod restart{{ end }}

@@ -1,0 +1,132 @@
+# ---------------------------------------------------------------------------
+# Default values for the user-mgmt chart.
+# Everything the app needs is configured from this file - no values are
+# hardcoded inside the templates. Per-environment overrides live in
+# values-dev.yaml / values-prod.yaml.
+# ---------------------------------------------------------------------------
+
+# Override the generated resource name prefix (default: <release>-<chart>).
+nameOverride: ""
+fullnameOverride: ""
+
+# Namespace every object is created in. Empty means "whatever the release /
+# ArgoCD Application targets" (.Release.Namespace), which is the normal case:
+# one namespace per environment. Set it only to pin the chart to a fixed
+# namespace regardless of the release.
+namespaceOverride: ""
+
+global:
+  # Cluster DNS domain - used to build fully qualified Service names so that
+  # in-cluster addresses keep working if components ever move to separate
+  # namespaces.
+  clusterDomain: cluster.local
+  # Image tag used by any component that does not set its own.
+  imageTag: "latest"
+  imagePullPolicy: IfNotPresent
+  # Extra labels added to every object in the chart.
+  labels: {}
+
+# --------------------------------------------------------------------- backend
+backend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/luca-guettinger/user-mgmt-backend
+    tag: ""              # empty -> global.imageTag
+    pullPolicy: ""       # empty -> global.imagePullPolicy
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+  # Non-sensitive configuration -> rendered into a ConfigMap.
+  config:
+    JWT_ISSUER: user-mgmt-service
+    JWT_EXPIRATION_MILLIS: "3600000"
+    SPRING_JPA_HIBERNATE_DDL_AUTO: update
+  # Sensitive configuration -> rendered into a Secret.
+  secrets:
+    JWT_SECRET: change-me-to-a-long-random-secret
+  resources: {}
+  probes:
+    enabled: false
+    path: /actuator/health
+    initialDelaySeconds: 30
+    periodSeconds: 10
+
+# -------------------------------------------------------------------- frontend
+frontend:
+  enabled: true
+  replicaCount: 1
+  image:
+    repository: ghcr.io/luca-guettinger/auth-portal
+    tag: ""
+    pullPolicy: ""
+  containerPort: 3000
+  service:
+    type: ClusterIP
+    port: 3000
+  config:
+    HOSTNAME: "0.0.0.0"
+    PORT: "3000"
+    # NOTE: NEXT_PUBLIC_* is baked into the Next.js image at BUILD time.
+    # Changing it here alone is not enough - the image must be rebuilt.
+    NEXT_PUBLIC_API_URL: http://localhost:3000/backend
+  resources: {}
+
+# -------------------------------------------------------------------- postgres
+postgres:
+  enabled: true
+  image:
+    repository: postgres
+    tag: "16-alpine"
+    pullPolicy: ""
+  containerPort: 5432
+  service:
+    type: ClusterIP
+    port: 5432
+  # Credentials + database name. username/password go into a Secret,
+  # the database name into a ConfigMap.
+  auth:
+    username: postgres
+    password: change-me
+    database: userdb
+  # Persistent storage for the database (PersistentVolumeClaim).
+  persistence:
+    enabled: true
+    # Empty -> cluster default StorageClass.
+    storageClass: ""
+    accessMode: ReadWriteOnce
+    size: 8Gi
+    mountPath: /var/lib/postgresql/data
+    # Postgres refuses to start on a volume root that contains lost+found,
+    # so the data directory lives in a subdirectory of the volume.
+    subPath: pgdata
+  resources: {}
+
+# --------------------------------------------------------------------- ingress
+ingress:
+  enabled: false
+  className: nginx
+  host: localhost
+  # Requests starting with this prefix go to the backend (prefix is stripped),
+  # everything else goes to the frontend.
+  backendPathPrefix: /backend
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+  tls:
+    enabled: false
+    secretName: user-mgmt-tls
+    # cert-manager ClusterIssuer that should issue the certificate.
+    clusterIssuer: letsencrypt-prod
+
+# ---------------------------------------------------------------- cert-manager
+certManager:
+  clusterIssuer:
+    # Create the ClusterIssuer as part of this chart. Requires cert-manager
+    # (and its CRDs) to be installed in the cluster.
+    create: false
+    name: letsencrypt-prod
+    email: luca.guettinger@cmi.ch
+    server: https://acme-v02.api.letsencrypt.org/directory
+    privateKeySecretName: letsencrypt-prod-account-key

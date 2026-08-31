@@ -1,0 +1,49 @@
+# ---------------------------------------------------------------------------
+# Environment: prod (DigitalOcean managed cluster, fra1)
+# Only the values that differ from values.yaml.
+# Deployed into namespace: user-mgmt
+# ---------------------------------------------------------------------------
+
+global:
+  imageTag: latest
+  labels:
+    environment: prod
+
+backend:
+  replicaCount: 1
+  # Reachable only through the ingress.
+  service:
+    type: ClusterIP
+
+frontend:
+  replicaCount: 1
+  service:
+    type: ClusterIP
+  config:
+    # Baked into the Next.js image at build time - rebuild the image when
+    # this changes.
+    NEXT_PUBLIC_API_URL: https://kube.nightnode.io/backend
+
+postgres:
+  auth:
+    # TODO: replace with a real secret (Sealed Secrets / SOPS / External Secrets).
+    password: change-me
+  persistence:
+    enabled: true
+    size: 8Gi
+    # DigitalOcean block storage, Retain so the volume survives a delete.
+    storageClass: do-block-storage-retain
+
+ingress:
+  enabled: true
+  className: nginx
+  host: kube.nightnode.io
+  tls:
+    enabled: true
+    secretName: kube-nightnode-tls
+    clusterIssuer: letsencrypt-prod
+
+certManager:
+  clusterIssuer:
+    create: true
+    email: luca.guettinger@cmi.ch
