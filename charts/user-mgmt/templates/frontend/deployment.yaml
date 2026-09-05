@@ -31,6 +31,11 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "user-mgmt.componentName" $ctx }}
+          {{- if .Values.frontend.probes.startup.enabled }}
+          # Holds the other two probes off until the app has finished booting.
+          startupProbe:
+            {{- include "user-mgmt.httpProbe" (dict "probe" .Values.frontend.probes.startup "port" "http") | nindent 12 }}
+          {{- end }}
           {{- if .Values.frontend.probes.readiness.enabled }}
           readinessProbe:
             {{- include "user-mgmt.httpProbe" (dict "probe" .Values.frontend.probes.readiness "port" "http") | nindent 12 }}

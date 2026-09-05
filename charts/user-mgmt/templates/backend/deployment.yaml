@@ -37,6 +37,11 @@ spec:
                 name: {{ include "user-mgmt.componentName" $ctx }}
             - secretRef:
                 name: {{ include "user-mgmt.componentName" $ctx }}
+          {{- if .Values.backend.probes.startup.enabled }}
+          # Holds the other two probes off until the app has finished booting.
+          startupProbe:
+            {{- include "user-mgmt.httpProbe" (dict "probe" .Values.backend.probes.startup "port" "http") | nindent 12 }}
+          {{- end }}
           {{- if .Values.backend.probes.readiness.enabled }}
           # Gates Service endpoints: no traffic until Spring Boot has booted.
           readinessProbe:

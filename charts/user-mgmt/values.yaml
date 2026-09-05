@@ -52,6 +52,18 @@ backend:
     # Spring Security in this app permits /actuator/health only - the
     # /readiness and /liveness sub-groups answer 403 - so both probes
     # use the same path.
+    #
+    # The JVM needs ~110s to boot on a 1-vCPU node. The startup probe holds
+    # readiness and liveness off until it answers, so a slow boot is not
+    # mistaken for a hung process and killed.
+    startup:
+      enabled: true
+      path: /actuator/health
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 3
+      # 10 + 30x10 = up to 5 minutes to come up.
+      failureThreshold: 30
     readiness:
       enabled: true
       path: /actuator/health
@@ -111,6 +123,13 @@ frontend:
       memory: 256Mi
   probes:
     # "/" answers 307 (redirect to /login), which counts as probe success.
+    startup:
+      enabled: true
+      path: /
+      initialDelaySeconds: 5
+      periodSeconds: 5
+      timeoutSeconds: 3
+      failureThreshold: 12
     readiness:
       enabled: true
       path: /
