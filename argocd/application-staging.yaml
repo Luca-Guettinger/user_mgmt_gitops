@@ -1,0 +1,36 @@
+# Same chart, staging values, its own namespace.
+# The Application name becomes the Helm release name, so every object here is
+# prefixed user-mgmt-staging- and cannot collide with prod.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: user-mgmt-staging
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: user-mgmt
+  source:
+    repoURL: https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+    targetRevision: main
+    path: charts/user-mgmt
+    helm:
+      valueFiles:
+        - values.yaml
+        - values-staging.yaml
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: user-mgmt-staging
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      - ServerSideApply=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

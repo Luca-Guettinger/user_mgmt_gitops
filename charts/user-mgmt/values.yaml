@@ -1,34 +1,23 @@
-# ---------------------------------------------------------------------------
 # Default values for the user-mgmt chart.
-# Everything the app needs is configured from this file - no values are
-# hardcoded inside the templates. Per-environment overrides live in
-# values-dev.yaml / values-prod.yaml.
-# ---------------------------------------------------------------------------
+# Environment overrides live in values-staging.yaml / values-prod.yaml.
+# values-dev.yaml targets a local kind cluster and is not managed by ArgoCD.
 
-# Override the generated resource name prefix (default: <release>-<chart>).
 nameOverride: ""
 fullnameOverride: ""
 
-# Namespace every object is created in. Empty means "whatever the release /
-# ArgoCD Application targets" (.Release.Namespace), which is the normal case:
-# one namespace per environment. Set it only to pin the chart to a fixed
-# namespace regardless of the release.
+# Empty means "whatever the release / ArgoCD Application targets".
 namespaceOverride: ""
 
 global:
-  # Cluster DNS domain - used to build fully qualified Service names so that
-  # in-cluster addresses keep working if components ever move to separate
-  # namespaces.
   clusterDomain: cluster.local
-  # Image tag used by any component that does not set its own.
   imageTag: "latest"
   imagePullPolicy: IfNotPresent
-  # Extra labels added to every object in the chart.
   labels: {}
 
 # --------------------------------------------------------------------- backend
 backend:
   enabled: true
+  # Ignored when autoscaling.enabled is true - the HPA owns the replica count.
   replicaCount: 1
   image:
     repository: ghcr.io/luca-guettinger/user-mgmt-backend
@@ -38,22 +27,57 @@ backend:
   service:
     type: ClusterIP
     port: 8080
-  # Non-sensitive configuration -> rendered into a ConfigMap.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      # 0 means a new pod must be Ready before an old one is taken down.
+      maxUnavailable: 0
   config:
     JWT_ISSUER: user-mgmt-service
     JWT_EXPIRATION_MILLIS: "3600000"
     SPRING_JPA_HIBERNATE_DDL_AUTO: update
-  # Sensitive configuration -> rendered into a Secret.
   secrets:
-    # Must be valid Base64: the backend does Decoders.BASE64.decode() on this
-    # value and hands the bytes to Keys.hmacShaKeyFor (64 bytes -> HS512).
+    # Must be valid Base64: the backend runs Decoders.BASE64.decode() on this
+    # and hands the bytes to Keys.hmacShaKeyFor.
     JWT_SECRET: MvPBBahI529jCRYlxdT6r1Mqb9Fen/OBnZ7OdRwO9qf5pYtIe3yZxpzSHD0r1NENECGN6L2ueHBdQsNyqIxemg==
-  resources: {}
+  resources:
+    requests:
+      cpu: 100m
+      memory: 224Mi
+    limits:
+      cpu: 500m
+      memory: 640Mi
   probes:
+    # Spring Security in this app permits /actuator/health only - the
+    # /readiness and /liveness sub-groups answer 403 - so both probes
+    # use the same path.
+    readiness:
+      enabled: true
+      path: /actuator/health
+      initialDelaySeconds: 20
+      periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
+    liveness:
+      enabled: true
+      path: /actuator/health
+      initialDelaySeconds: 60
+      periodSeconds: 20
+      timeoutSeconds: 3
+      failureThreshold: 3
+  autoscaling:
     enabled: false
-    path: /actuator/health
-    initialDelaySeconds: 30
-    periodSeconds: 10
+    minReplicas: 2
+    maxReplicas: 4
+    targetCPUUtilizationPercentage: 70
+    # Empty disables the memory metric.
+    targetMemoryUtilizationPercentage: ""
+  pdb:
+    # Enable only where minReplicas >= 2. With a single replica, minAvailable 1
+    # permits zero disruptions and blocks node drains.
+    enabled: false
+    minAvailable: 1
 
 # -------------------------------------------------------------------- frontend
 frontend:
@@ -67,13 +91,49 @@ frontend:
   service:
     type: ClusterIP
     port: 3000
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
   config:
     HOSTNAME: "0.0.0.0"
     PORT: "3000"
-    # NOTE: NEXT_PUBLIC_* is baked into the Next.js image at BUILD time.
+    # NEXT_PUBLIC_* is baked into the Next.js bundle at BUILD time.
     # Changing it here alone is not enough - the image must be rebuilt.
     NEXT_PUBLIC_API_URL: http://localhost:3000/backend
-  resources: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+  probes:
+    # "/" answers 307 (redirect to /login), which counts as probe success.
+    readiness:
+      enabled: true
+      path: /
+      initialDelaySeconds: 10
+      periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
+    liveness:
+      enabled: true
+      path: /
+      initialDelaySeconds: 30
+      periodSeconds: 20
+      timeoutSeconds: 3
+      failureThreshold: 3
+  autoscaling:
+    enabled: false
+    minReplicas: 2
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+    targetMemoryUtilizationPercentage: ""
+  pdb:
+    enabled: false
+    minAvailable: 1
 
 # -------------------------------------------------------------------- postgres
 postgres:
@@ -86,50 +146,91 @@ postgres:
   service:
     type: ClusterIP
     port: 5432
-  # Credentials + database name. username/password go into a Secret,
-  # the database name into a ConfigMap.
   auth:
     username: postgres
     password: change-me
     database: userdb
-  # Persistent storage for the database (PersistentVolumeClaim).
   persistence:
     enabled: true
     # Empty -> cluster default StorageClass.
     storageClass: ""
     accessMode: ReadWriteOnce
     size: 8Gi
-    # Keep the volume when the release is uninstalled. Handy for real data,
-    # but a kept volume keeps costing money after the cluster is gone.
     keepOnDelete: false
     mountPath: /var/lib/postgresql/data
-    # Postgres refuses to start on a volume root that contains lost+found,
-    # so the data directory lives in a subdirectory of the volume.
+    # Block storage volumes contain lost+found, which Postgres refuses to
+    # initialise into, so the data directory lives one level down.
     subPath: pgdata
-  resources: {}
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
+  probes:
+    readiness:
+      enabled: true
+      initialDelaySeconds: 5
+      periodSeconds: 10
+    liveness:
+      enabled: true
+      initialDelaySeconds: 30
+      periodSeconds: 20
+
+# -------------------------------------------------- namespace-level guardrails
+# ResourceQuota caps what the whole namespace may consume. LimitRange supplies
+# defaults, so pods created in this namespace by other controllers - notably
+# cert-manager's ACME solver, which declares no resources - still satisfy the
+# quota instead of being rejected.
+namespaceResources:
+  resourceQuota:
+    enabled: false
+    hard:
+      requests.cpu: "1"
+      requests.memory: 1Gi
+      limits.cpu: "3"
+      limits.memory: 3Gi
+      pods: "15"
+      persistentvolumeclaims: "2"
+  limitRange:
+    enabled: false
+    default:
+      cpu: 300m
+      memory: 256Mi
+    defaultRequest:
+      cpu: 50m
+      memory: 128Mi
+
+# Namespace isolation: default-deny on ingress, then only the flows the app
+# actually needs. Traffic from any other namespace is dropped.
+networkPolicy:
+  enabled: false
+  # Namespace the ingress controller runs in, matched on the automatic
+  # kubernetes.io/metadata.name label.
+  ingressNamespace: ingress-nginx
 
 # --------------------------------------------------------------------- ingress
 ingress:
   enabled: false
   className: nginx
   host: localhost
-  # Requests starting with this prefix go to the backend (prefix is stripped),
+  # Requests starting with this prefix go to the backend (prefix stripped),
   # everything else goes to the frontend.
   backendPathPrefix: /backend
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /$2
     nginx.ingress.kubernetes.io/use-regex: "true"
+    # Explicit round robin across the Ready endpoints of each Service.
+    nginx.ingress.kubernetes.io/load-balance: round_robin
   tls:
     enabled: false
     secretName: user-mgmt-tls
-    # cert-manager ClusterIssuer that should issue the certificate.
     clusterIssuer: letsencrypt-prod
 
 # ---------------------------------------------------------------- cert-manager
 certManager:
   clusterIssuer:
-    # Create the ClusterIssuer as part of this chart. Requires cert-manager
-    # (and its CRDs) to be installed in the cluster.
     create: false
     name: letsencrypt-prod
     email: luca.guettinger@cmi.ch

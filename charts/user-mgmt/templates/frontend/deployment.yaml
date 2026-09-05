@@ -8,7 +8,9 @@ metadata:
   labels:
     {{- include "user-mgmt.labels" $ctx | nindent 4 }}
 spec:
-  replicas: {{ .Values.frontend.replicaCount }}
+  {{- include "user-mgmt.replicas" .Values.frontend | nindent 2 }}
+  strategy:
+    {{- toYaml .Values.frontend.strategy | nindent 4 }}
   selector:
     matchLabels:
       {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
@@ -29,6 +31,14 @@ spec:
           envFrom:
             - configMapRef:
                 name: {{ include "user-mgmt.componentName" $ctx }}
+          {{- if .Values.frontend.probes.readiness.enabled }}
+          readinessProbe:
+            {{- include "user-mgmt.httpProbe" (dict "probe" .Values.frontend.probes.readiness "port" "http") | nindent 12 }}
+          {{- end }}
+          {{- if .Values.frontend.probes.liveness.enabled }}
+          livenessProbe:
+            {{- include "user-mgmt.httpProbe" (dict "probe" .Values.frontend.probes.liveness "port" "http") | nindent 12 }}
+          {{- end }}
           {{- with .Values.frontend.resources }}
           resources:
             {{- toYaml . | nindent 12 }}

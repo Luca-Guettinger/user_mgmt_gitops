@@ -1,0 +1,36 @@
+{{- $ctx := dict "root" . "component" "namespace" }}
+{{- if .Values.namespaceResources.resourceQuota.enabled }}
+# Hard ceiling on what this environment may consume. Two environments share one
+# cluster, so without this a runaway HPA in staging could starve production.
+apiVersion: v1
+kind: ResourceQuota
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}-quota
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  hard:
+    {{- toYaml .Values.namespaceResources.resourceQuota.hard | nindent 4 }}
+{{- end }}
+{{- if .Values.namespaceResources.limitRange.enabled }}
+---
+# Once a ResourceQuota constrains requests/limits, every pod in the namespace
+# must declare them or creation is rejected. The chart's own pods do. Pods
+# created here by other controllers - cert-manager's ACME solver during a
+# certificate renewal - do not, so this supplies defaults for them.
+apiVersion: v1
+kind: LimitRange
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}-limits
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  limits:
+    - type: Container
+      default:
+        {{- toYaml .Values.namespaceResources.limitRange.default | nindent 8 }}
+      defaultRequest:
+        {{- toYaml .Values.namespaceResources.limitRange.defaultRequest | nindent 8 }}
+{{- end }}

@@ -127,3 +127,30 @@ Usage: {{ include "user-mgmt.dbCredentialEnv" (dict "root" . "userVar" "POSTGRES
       name: {{ include "user-mgmt.postgresSecretName" .root }}
       key: password
 {{- end -}}
+
+{{/*
+Body of an HTTP probe. Used for both the readiness and the liveness probe of
+the backend and the frontend, so the two never drift apart.
+Usage: {{ include "user-mgmt.httpProbe" (dict "probe" .Values.backend.probes.readiness "port" "http") | nindent 12 }}
+*/}}
+{{- define "user-mgmt.httpProbe" -}}
+httpGet:
+  path: {{ .probe.path }}
+  port: {{ .port }}
+initialDelaySeconds: {{ .probe.initialDelaySeconds }}
+periodSeconds: {{ .probe.periodSeconds }}
+timeoutSeconds: {{ .probe.timeoutSeconds }}
+failureThreshold: {{ .probe.failureThreshold }}
+{{- end -}}
+
+{{/*
+Number of replicas to write into a Deployment. Renders nothing when an HPA
+owns the component: leaving replicas in the manifest would make ArgoCD
+selfHeal fight the autoscaler and reset it on every sync.
+Usage: {{ include "user-mgmt.replicas" .Values.backend | nindent 2 }}
+*/}}
+{{- define "user-mgmt.replicas" -}}
+{{- if not .autoscaling.enabled -}}
+replicas: {{ .replicaCount }}
+{{- end -}}
+{{- end -}}

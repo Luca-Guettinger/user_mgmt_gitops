@@ -1,0 +1,24 @@
+{{/*
+PodDisruptionBudget per component. This constrains *voluntary* disruptions -
+node drains, cluster upgrades, rescheduling - not crashes. It tells Kubernetes
+how many replicas must stay up while it moves pods around.
+*/}}
+{{- range $component := list "backend" "frontend" }}
+{{- $cfg := index $.Values $component }}
+{{- if and $cfg.enabled $cfg.pdb.enabled }}
+{{- $ctx := dict "root" $ "component" $component }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" $ }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  minAvailable: {{ $cfg.pdb.minAvailable }}
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
+{{- end }}
+{{- end }}

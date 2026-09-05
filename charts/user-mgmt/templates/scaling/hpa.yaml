@@ -1,0 +1,51 @@
+{{/*
+One HorizontalPodAutoscaler per component that enables autoscaling.
+The HPA reads CPU usage from metrics-server and compares it against the
+container's CPU *request*, which is why requests are mandatory in values.yaml.
+*/}}
+{{- range $component := list "backend" "frontend" }}
+{{- $cfg := index $.Values $component }}
+{{- if and $cfg.enabled $cfg.autoscaling.enabled }}
+{{- $ctx := dict "root" $ "component" $component }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" $ }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "user-mgmt.componentName" $ctx }}
+  minReplicas: {{ $cfg.autoscaling.minReplicas }}
+  maxReplicas: {{ $cfg.autoscaling.maxReplicas }}
+  metrics:
+    {{- if $cfg.autoscaling.targetCPUUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: {{ $cfg.autoscaling.targetCPUUtilizationPercentage }}
+    {{- end }}
+    {{- if $cfg.autoscaling.targetMemoryUtilizationPercentage }}
+    - type: Resource
+      resource:
+        name: memory
+        target:
+          type: Utilization
+          averageUtilization: {{ $cfg.autoscaling.targetMemoryUtilizationPercentage }}
+    {{- end }}
+  behavior:
+    scaleUp:
+      # React quickly to load.
+      stabilizationWindowSeconds: 60
+    scaleDown:
+      # Scale down slowly, so a brief dip does not remove capacity that is
+      # needed again a minute later.
+      stabilizationWindowSeconds: 300
+{{- end }}
+{{- end }}

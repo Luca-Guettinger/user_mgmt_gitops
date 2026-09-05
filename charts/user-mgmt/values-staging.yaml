@@ -1,0 +1,96 @@
+# Environment: staging (same DigitalOcean cluster as prod, separate namespace)
+# Only the values that differ from values.yaml.
+# Deployed into namespace: user-mgmt-staging
+#
+# Deliberately smaller than prod: both environments share two s-1vcpu-2gb
+# nodes, and prod gets the headroom it needs to autoscale.
+
+global:
+  imageTag: latest
+  labels:
+    environment: staging
+
+backend:
+  service:
+    type: ClusterIP
+  config:
+    JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=96m"
+  resources:
+    requests:
+      cpu: 50m
+      memory: 160Mi
+    limits:
+      cpu: 400m
+      memory: 448Mi
+  autoscaling:
+    enabled: true
+    minReplicas: 1
+    maxReplicas: 2
+    targetCPUUtilizationPercentage: 80
+  pdb:
+    # Off on purpose: with minReplicas 1 a minAvailable of 1 allows zero
+    # voluntary disruptions and would block node drains.
+    enabled: false
+
+frontend:
+  replicaCount: 1
+  service:
+    type: ClusterIP
+  resources:
+    requests:
+      cpu: 25m
+      memory: 96Mi
+    limits:
+      cpu: 200m
+      memory: 224Mi
+  config:
+    # No ingress in staging, so the portal is reached by port-forward and
+    # the browser calls the API on localhost.
+    NEXT_PUBLIC_API_URL: http://localhost:8080/backend
+
+postgres:
+  auth:
+    password: staging-change-me
+  persistence:
+    enabled: true
+    size: 1Gi
+    storageClass: do-block-storage
+    keepOnDelete: false
+  resources:
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 300m
+      memory: 256Mi
+
+namespaceResources:
+  resourceQuota:
+    enabled: true
+    hard:
+      requests.cpu: 500m
+      requests.memory: 768Mi
+      limits.cpu: "2"
+      limits.memory: 2Gi
+      pods: "10"
+      persistentvolumeclaims: "2"
+  limitRange:
+    enabled: true
+
+networkPolicy:
+  enabled: true
+
+# No ingress: prod owns vsc.notenverwaltung.ch, and a second host would need
+# its own DNS record and certificate. Reach staging with
+#   kubectl -n user-mgmt-staging port-forward svc/user-mgmt-staging-frontend 8080:3000
+# To publish it instead, point a DNS A record for staging.vsc.notenverwaltung.ch
+# at the same LoadBalancer IP, then set enabled/tls.enabled true with that host
+# and rebuild the portal image with the matching NEXT_PUBLIC_API_URL.
+ingress:
+  enabled: false
+
+certManager:
+  clusterIssuer:
+    # Prod already creates the shared ClusterIssuer; it is cluster-scoped, so
+    # creating it twice would make the two Applications fight over one object.
+    create: false

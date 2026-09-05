@@ -1,8 +1,6 @@
-# ---------------------------------------------------------------------------
 # Environment: prod (DigitalOcean managed cluster, fra1)
 # Only the values that differ from values.yaml.
 # Deployed into namespace: user-mgmt
-# ---------------------------------------------------------------------------
 
 global:
   imageTag: latest
@@ -10,23 +8,34 @@ global:
     environment: prod
 
 backend:
-  replicaCount: 1
-  # Reachable only through the ingress.
   service:
     type: ClusterIP
   config:
-    # Cap the JVM heap so backend + frontend + postgres + argocd all fit on a
-    # single 2 GB node (the cheapest size DOKS offers).
+    # Cap the JVM heap. The node pool is 2x s-1vcpu-2gb with ~1465Mi
+    # allocatable each, and the HPA may run three of these at once.
     JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=128m"
   resources:
     requests:
       cpu: 100m
       # Deliberately below what the JVM actually uses: this only reserves
-      # scheduling room. 384Mi filled the 2 GB node and left no space for the
-      # postgres pod. The limit below is what actually caps the container.
+      # scheduling room, and the HPA measures utilisation against it.
+      # The limit below is what actually caps the container.
       memory: 224Mi
     limits:
+      cpu: 500m
       memory: 640Mi
+  autoscaling:
+    enabled: true
+    # Two replicas is the floor: it is what makes the PDB meaningful and lets
+    # a rolling update happen without a gap in service.
+    minReplicas: 2
+    # Three is the ceiling the current two nodes can actually schedule.
+    # Raising it needs a third node.
+    maxReplicas: 3
+    targetCPUUtilizationPercentage: 70
+  pdb:
+    enabled: true
+    minAvailable: 1
 
 frontend:
   replicaCount: 1
@@ -37,6 +46,7 @@ frontend:
       cpu: 50m
       memory: 128Mi
     limits:
+      cpu: 300m
       memory: 256Mi
   config:
     # Baked into the Next.js image at build time - rebuild the image when
@@ -49,8 +59,7 @@ postgres:
     password: aed8e71486da7ef9ad8322c362a6279e
   persistence:
     enabled: true
-    # Block storage is billed at 0.10 USD per GiB per month. The database for
-    # this app is tiny, so 1 GiB (the minimum) is plenty.
+    # Block storage is billed at 0.10 USD per GiB per month, 1 GiB minimum.
     size: 1Gi
     # Plain do-block-storage has reclaimPolicy Delete: removing the PVC also
     # removes the volume, so nothing keeps billing after the cluster is gone.
@@ -62,7 +71,26 @@ postgres:
       cpu: 50m
       memory: 128Mi
     limits:
+      cpu: 500m
       memory: 256Mi
+
+namespaceResources:
+  resourceQuota:
+    enabled: true
+    # Sized for the HPA at full stretch (3 backend) plus one surge pod during
+    # a rolling update, with headroom.
+    hard:
+      requests.cpu: "1"
+      requests.memory: 1536Mi
+      limits.cpu: "4"
+      limits.memory: 4Gi
+      pods: "15"
+      persistentvolumeclaims: "2"
+  limitRange:
+    enabled: true
+
+networkPolicy:
+  enabled: true
 
 ingress:
   enabled: true
