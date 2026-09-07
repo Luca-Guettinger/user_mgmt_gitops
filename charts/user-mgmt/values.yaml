@@ -94,7 +94,7 @@ backend:
 # -------------------------------------------------------------------- frontend
 frontend:
   enabled: true
-  replicaCount: 1
+  replicaCount: 2
   image:
     repository: ghcr.io/luca-guettinger/auth-portal
     tag: ""
