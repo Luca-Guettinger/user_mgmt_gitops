@@ -79,6 +79,15 @@ namespaceResources:
 
 networkPolicy:
   enabled: true
+  monitoringNamespace: monitoring
+  # Staging is the load-test target: it is not serving anyone.
+  loadTestNamespace: k6
+
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
 
 # No ingress: prod owns vsc.notenverwaltung.ch, and a second host would need
 # its own DNS record and certificate. Reach staging with

@@ -1,0 +1,20 @@
+{{/*
+One ConfigMap per JSON file in dashboards/. The Grafana sidecar shipped by
+kube-prometheus-stack watches for the grafana_dashboard label and imports
+whatever it finds, so adding a dashboard means adding a file and nothing else.
+*/}}
+{{- range $path, $_ := .Files.Glob "dashboards/*.json" }}
+{{- $name := base $path | trimSuffix ".json" }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: grafana-dashboard-{{ $name }}
+  namespace: {{ $.Release.Namespace }}
+  labels:
+    grafana_dashboard: "1"
+    app.kubernetes.io/managed-by: {{ $.Release.Service }}
+data:
+  {{ base $path }}: |
+{{ $.Files.Get $path | indent 4 }}
+{{- end }}

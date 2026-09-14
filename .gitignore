@@ -1,3 +1,9 @@
 # Rendered output / packaged charts
 *.tgz
 rendered/
+
+# Helm dependency lock output is committed; the fetched subchart is not.
+charts/*/charts/
+
+# IDE
+.idea/

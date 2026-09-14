@@ -1,0 +1,163 @@
+# Configuration for the kube-prometheus-stack subchart.
+# Everything under the kube-prometheus-stack: key is passed to that chart.
+#
+# Sizing note: this cluster is DigitalOcean DOKS with small nodes, so every
+# component declares requests and limits and the stack is pinned to the node
+# pool labelled workload=monitoring (see the runbook).
+
+kube-prometheus-stack:
+
+  # ------------------------------------------------------------------ scrape
+  # DOKS does not expose the control plane, so these four would be permanently
+  # down and would alert forever.
+  kubeControllerManager:
+    enabled: false
+  kubeScheduler:
+    enabled: false
+  kubeEtcd:
+    enabled: false
+  kubeProxy:
+    enabled: false
+
+  # --------------------------------------------------------------- operator
+  prometheusOperator:
+    # No admission webhook: it needs a cert Job and a ValidatingWebhookConfiguration,
+    # which is a lot of moving parts for a two-environment cluster.
+    admissionWebhooks:
+      enabled: false
+    tls:
+      enabled: false
+    nodeSelector:
+      workload: monitoring
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # ------------------------------------------------------------- prometheus
+  prometheus:
+    prometheusSpec:
+      # Empty selectors mean "watch every namespace". Without this the operator
+      # only picks up objects labelled with this release name, and the app chart
+      # would have to hardcode that name.
+      serviceMonitorSelectorNilUsesHelmValues: false
+      serviceMonitorSelector: {}
+      serviceMonitorNamespaceSelector: {}
+      ruleSelectorNilUsesHelmValues: false
+      ruleSelector: {}
+      ruleNamespaceSelector: {}
+      podMonitorSelectorNilUsesHelmValues: false
+
+      # Lets the k6 Job push its own client-side metrics in (Aufgabe 2).
+      enableRemoteWriteReceiver: true
+
+      retention: 3d
+      retentionSize: 4GB
+
+      nodeSelector:
+        workload: monitoring
+      resources:
+        requests:
+          cpu: 100m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 900Mi
+
+      storageSpec:
+        volumeClaimTemplate:
+          spec:
+            storageClassName: do-block-storage
+            accessModes: ["ReadWriteOnce"]
+            resources:
+              requests:
+                storage: 5Gi
+
+  # ----------------------------------------------------------- alertmanager
+  alertmanager:
+    alertmanagerSpec:
+      # Mounted at /etc/alertmanager/secrets/alertmanager-discord/.
+      # Created by hand, never committed - see the runbook.
+      secrets:
+        - alertmanager-discord
+      replicas: 1
+      nodeSelector:
+        workload: monitoring
+      resources:
+        requests:
+          cpu: 10m
+          memory: 64Mi
+        limits:
+          cpu: 100m
+          memory: 128Mi
+
+    config:
+      route:
+        group_by: [namespace, alertname]
+        group_wait: 30s
+        group_interval: 5m
+        repeat_interval: 4h
+        receiver: discord
+        routes:
+          # The stack ships an always-firing heartbeat alert; it proves the
+          # pipeline works but must not reach the channel.
+          - matchers: ['alertname = "Watchdog"']
+            receiver: "null"
+      receivers:
+        - name: "null"
+        - name: discord
+          discord_configs:
+            # Reading the URL from the mounted Secret keeps it out of Git.
+            - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
+              send_resolved: true
+
+  # ---------------------------------------------------------------- grafana
+  grafana:
+    # Our own dashboards are the deliverable; the ~30 bundled ones cost
+    # ConfigMaps and sidecar memory we do not have.
+    defaultDashboardsEnabled: false
+
+    admin:
+      existingSecret: grafana-admin
+      userKey: admin-user
+      passwordKey: admin-password
+
+    # Dashboards and the datasource are provisioned from ConfigMaps, so there
+    # is no state worth a volume.
+    persistence:
+      enabled: false
+
+    nodeSelector:
+      workload: monitoring
+    resources:
+      requests:
+        cpu: 25m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+  # -------------------------------------------------------- state / exporter
+  kube-state-metrics:
+    nodeSelector:
+      workload: monitoring
+    resources:
+      requests:
+        cpu: 10m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+
+  # DaemonSet: it must run on every node, so no nodeSelector here.
+  prometheus-node-exporter:
+    resources:
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 50m
+        memory: 64Mi

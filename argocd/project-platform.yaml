@@ -1,0 +1,32 @@
+# Platform-level project: everything that is shared infrastructure rather than
+# the application itself. The user-mgmt project cannot host this - it is scoped
+# to the user-mgmt* namespaces and to two cluster-scoped kinds.
+apiVersion: argoproj.io/v1alpha1
+kind: AppProject
+metadata:
+  name: platform
+  namespace: argocd
+spec:
+  description: Shared platform components (observability)
+  sourceRepos:
+    - https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+    # The monitoring chart declares kube-prometheus-stack as a dependency.
+    - https://prometheus-community.github.io/helm-charts
+  destinations:
+    - server: https://kubernetes.default.svc
+      namespace: monitoring
+  namespaceResourceWhitelist:
+    - group: '*'
+      kind: '*'
+  # Cluster-scoped resources kube-prometheus-stack genuinely needs: the target
+  # namespace, the Prometheus Operator CRDs, and the RBAC that lets Prometheus
+  # and kube-state-metrics read the whole cluster.
+  clusterResourceWhitelist:
+    - group: ''
+      kind: Namespace
+    - group: apiextensions.k8s.io
+      kind: CustomResourceDefinition
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRole
+    - group: rbac.authorization.k8s.io
+      kind: ClusterRoleBinding

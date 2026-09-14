@@ -1,0 +1,14 @@
+apiVersion: v2
+name: monitoring
+description: Observability stack - kube-prometheus-stack plus the dashboards for this platform
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+# The whole stack is one upstream chart. This wrapper exists so that our
+# values.yaml and our Grafana dashboards live in the ops repository and are
+# rendered by ArgoCD as a single Application.
+dependencies:
+  - name: kube-prometheus-stack
+    version: "90.0.0"
+    repository: https://prometheus-community.github.io/helm-charts

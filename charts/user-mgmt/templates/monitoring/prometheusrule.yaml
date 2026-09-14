@@ -1,0 +1,56 @@
+{{- if .Values.metrics.prometheusRule.enabled }}
+{{- $ctx := dict "root" . "component" "backend" }}
+{{- $job := include "user-mgmt.componentName" $ctx }}
+{{- $ns := include "user-mgmt.namespace" . }}
+{{- $r := .Values.metrics.prometheusRule }}
+# Alert rules for the backend. The job label is derived from the component name
+# for the same reason the JDBC URL is - it can then never drift from the Service.
+#
+# A rate over an idle service divides zero by zero, which yields NaN, and NaN
+# compares false against any threshold. So an idle environment does not alert.
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ $ns }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  groups:
+    - name: {{ $job }}
+      rules:
+        # The business-facing failure: new users cannot sign up.
+        - alert: UserMgmtRegistrationFailing
+          expr: >-
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}",uri="/users/register",outcome="SERVER_ERROR"}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}",uri="/users/register"}[5m]))
+            > {{ $r.registrationErrorRatio }}
+          for: {{ $r.for }}
+          labels:
+            severity: critical
+            namespace: {{ $ns }}
+          annotations:
+            summary: "User registration is failing in {{ $ns }}"
+            description: >-
+              More than {{ mulf $r.registrationErrorRatio 100 }}% of POST /users/register
+              requests have returned 5xx for {{ $r.for }}. New users cannot sign up.
+              Usual cause: the database is unreachable.
+
+        # The broad safety net across every endpoint.
+        - alert: UserMgmtBackendHighErrorRate
+          expr: >-
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}",outcome="SERVER_ERROR"}[5m]))
+            /
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}"}[5m]))
+            > {{ $r.errorRatio }}
+          for: {{ $r.for }}
+          labels:
+            severity: warning
+            namespace: {{ $ns }}
+          annotations:
+            summary: "Backend error rate above {{ mulf $r.errorRatio 100 }}% in {{ $ns }}"
+            description: >-
+              The backend has answered more than {{ mulf $r.errorRatio 100 }}% of all
+              requests with a 5xx for {{ $r.for }}.
+{{- end }}

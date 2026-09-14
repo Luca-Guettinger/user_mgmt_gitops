@@ -11,8 +11,8 @@ backend:
   service:
     type: ClusterIP
   config:
-    # Cap the JVM heap. The node pool is 2x s-1vcpu-2gb with ~1465Mi
-    # allocatable each, and the HPA may run three of these at once.
+    # Cap the JVM heap. The small nodes have ~1465Mi allocatable each and
+    # the HPA may run three of these at once.
     JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=128m"
   resources:
     requests:
@@ -29,8 +29,7 @@ backend:
     # Two replicas is the floor: it is what makes the PDB meaningful and lets
     # a rolling update happen without a gap in service.
     minReplicas: 2
-    # Three is the ceiling the current two nodes can actually schedule.
-    # Raising it needs a third node.
+    # Three is the ceiling the node pool can actually schedule.
     maxReplicas: 3
     targetCPUUtilizationPercentage: 70
   pdb:
@@ -38,7 +37,8 @@ backend:
     minAvailable: 1
 
 frontend:
-  replicaCount: 2
+  # One replica is enough: this is a school project, not an HA deployment.
+  replicaCount: 1
   service:
     type: ClusterIP
   resources:
@@ -91,6 +91,15 @@ namespaceResources:
 
 networkPolicy:
   enabled: true
+  monitoringNamespace: monitoring
+  # Deliberately empty: no load generator may reach the live site.
+  loadTestNamespace: ""
+
+metrics:
+  serviceMonitor:
+    enabled: true
+  prometheusRule:
+    enabled: true
 
 ingress:
   enabled: true

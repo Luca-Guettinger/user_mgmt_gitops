@@ -1,0 +1,27 @@
+{{- if .Values.metrics.serviceMonitor.enabled }}
+{{- $ctx := dict "root" . "component" "backend" }}
+# Tells the Prometheus Operator to scrape the backend Service. The operator
+# turns this into a scrape job named after the Service, and adds the namespace,
+# service and pod labels every query and dashboard in this repo relies on.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ include "user-mgmt.namespace" . }}
+  endpoints:
+    # "http" is the port name on the backend Service; Micrometer serves the
+    # Prometheus text format on the same port as the API.
+    - port: http
+      path: {{ .Values.metrics.serviceMonitor.path }}
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+{{- end }}

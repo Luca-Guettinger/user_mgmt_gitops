@@ -1,0 +1,66 @@
+# k6 runs inside the cluster, in its own namespace.
+#
+# Its own namespace, not user-mgmt-staging, because that namespace has a
+# ResourceQuota (pods: 10, requests.cpu: 500m) that is already almost fully
+# spoken for, and a LimitRange that would inject requests into this pod.
+#
+# The script itself lives in k6/load-test.js and is turned into the ConfigMap
+# by k6/run.sh - do not edit it here.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: k6
+  labels:
+    # The allow-loadtest-to-backend NetworkPolicy matches on this label.
+    kubernetes.io/metadata.name: k6
+---
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: k6-load-test
+  namespace: k6
+spec:
+  backoffLimit: 0
+  # Keep a finished run around for a while so its logs stay readable.
+  ttlSecondsAfterFinished: 3600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: k6
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: k6
+          image: grafana/k6:latest
+          args:
+            - run
+            - /scripts/load-test.js
+            # Ship k6's own client-side metrics to Prometheus, so the load and
+            # the cluster's reaction can be read off one Grafana dashboard.
+            - --out
+            - experimental-prometheus-rw
+          envFrom:
+            # BASE_URL and TEST_ID, written by k6/run.sh. A Job's pod template
+            # is immutable, so per-run values cannot live in this file.
+            - configMapRef:
+                name: k6-config
+          env:
+            - name: K6_PROMETHEUS_RW_SERVER_URL
+              value: http://monitoring-kube-prometheus-prometheus.monitoring.svc.cluster.local:9090/api/v1/write
+            # Percentiles the Grafana dashboard plots.
+            - name: K6_PROMETHEUS_RW_TREND_STATS
+              value: p(95),p(99),avg,max
+          volumeMounts:
+            - name: scripts
+              mountPath: /scripts
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 500m
+              memory: 512Mi
+      volumes:
+        - name: scripts
+          configMap:
+            name: k6-script

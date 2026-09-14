@@ -89,4 +89,57 @@ spec:
       ports:
         - protocol: TCP
           port: {{ .Values.backend.containerPort }}
+{{- if .Values.networkPolicy.monitoringNamespace }}
+---
+# Prometheus scrapes /actuator/prometheus on the backend. Without this the
+# default-deny above drops the scrape and the target shows up as down.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}-allow-monitoring-to-backend
+  namespace: {{ $ns }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $backend | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.containerPort }}
+{{- end }}
+{{- if .Values.networkPolicy.loadTestNamespace }}
+---
+# The k6 Job runs in its own namespace and drives load at the backend Service.
+# Empty in production, so a load test cannot be pointed at the live site by
+# accident.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}-allow-loadtest-to-backend
+  namespace: {{ $ns }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $backend | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.loadTestNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.backend.containerPort }}
+{{- end }}
 {{- end }}

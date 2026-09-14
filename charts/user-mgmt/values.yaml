@@ -228,6 +228,29 @@ networkPolicy:
   # Namespace the ingress controller runs in, matched on the automatic
   # kubernetes.io/metadata.name label.
   ingressNamespace: ingress-nginx
+  # Namespace Prometheus runs in. Empty disables the scrape allow-rule.
+  monitoringNamespace: ""
+  # Namespace the k6 Job runs in. Empty means no load test may reach this
+  # environment - which is what production wants.
+  loadTestNamespace: ""
+
+# --------------------------------------------------------------------- metrics
+# Both objects are CRDs owned by the Prometheus Operator, so they can only be
+# enabled once kube-prometheus-stack is installed (charts/monitoring).
+metrics:
+  serviceMonitor:
+    enabled: false
+    path: /actuator/prometheus
+    interval: 30s
+    scrapeTimeout: 10s
+  prometheusRule:
+    enabled: false
+    # How long a condition must hold before the alert fires.
+    for: 5m
+    # Share of POST /users/register answered with a 5xx.
+    registrationErrorRatio: 0.10
+    # Share of all requests answered with a 5xx.
+    errorRatio: 0.05
 
 # --------------------------------------------------------------------- ingress
 ingress:

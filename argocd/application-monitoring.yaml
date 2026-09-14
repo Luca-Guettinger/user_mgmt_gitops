@@ -1,0 +1,35 @@
+# ArgoCD renders charts/monitoring - our values.yaml plus the kube-prometheus-stack
+# dependency - into the "monitoring" namespace.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: monitoring
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+    targetRevision: main
+    path: charts/monitoring
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: monitoring
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # Not optional here: the Prometheus Operator CRDs are larger than the
+      # 262144-byte annotation that client-side apply writes.
+      - ServerSideApply=true
+      # The first sync applies CRDs and the objects that use them in one pass.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m
