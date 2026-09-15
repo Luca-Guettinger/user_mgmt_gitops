@@ -3,7 +3,7 @@
 # Deployed into namespace: user-mgmt
 
 global:
-  imageTag: sha-598187d4e42157993a1f4ef8baea3347343fd7af
+  imageTag: sha-a02ab9bbce06579f341345eaf80a0db487e13466
   labels:
     environment: prod
 
