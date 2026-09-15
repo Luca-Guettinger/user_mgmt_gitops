@@ -18,6 +18,10 @@ kube-prometheus-stack:
     enabled: false
   kubeProxy:
     enabled: false
+  # Its scrape Service would be created in kube-system, which the platform
+  # project does not allow. DNS metrics are not needed here.
+  coreDns:
+    enabled: false
 
   # --------------------------------------------------------------- operator
   prometheusOperator:
