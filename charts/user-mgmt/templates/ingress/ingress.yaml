@@ -31,7 +31,8 @@ spec:
           {{- if .Values.backend.enabled }}
           # More specific path first: /backend/* -> backend, prefix stripped
           # by the rewrite-target annotation ($2 is everything after it).
-          - path: {{ printf "%s(/|$)(.*)" .Values.ingress.backendPathPrefix }}
+          # /actuator/prometheus is left out: only Prometheus inside the cluster reads it.
+          - path: {{ printf "%s(/|$)(?!actuator/prometheus)(.*)" .Values.ingress.backendPathPrefix }}
             pathType: ImplementationSpecific
             backend:
               service:
