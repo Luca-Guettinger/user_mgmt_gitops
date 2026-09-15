@@ -6,7 +6,9 @@
 # nodes, and prod gets the headroom it needs to autoscale.
 
 global:
-  imageTag: latest
+  # Pinned by hand: the pipeline only bumps prod, and a reused tag such as
+  # latest never triggers a rollout.
+  imageTag: sha-a02ab9bbce06579f341345eaf80a0db487e13466
   labels:
     environment: staging
 
