@@ -2,8 +2,8 @@
 *.tgz
 rendered/
 
-# Helm dependency lock output is committed; the fetched subchart is not.
-charts/*/charts/
+# Chart dependencies are vendored, so ArgoCD never has to download them.
+!charts/*/charts/*.tgz
 
 # IDE
 .idea/
