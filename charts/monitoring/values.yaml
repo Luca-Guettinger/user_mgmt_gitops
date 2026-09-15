@@ -83,13 +83,13 @@ kube-prometheus-stack:
   # ----------------------------------------------------------- alertmanager
   alertmanager:
     alertmanagerSpec:
-      # Mounted at /etc/alertmanager/secrets/alertmanager-discord/.
-      # Created by hand, never committed - see the runbook.
-      secrets:
-        - alertmanager-discord
       replicas: 1
       nodeSelector:
         workload: monitoring
+      # Lets the Discord AlertmanagerConfig below receive alerts from every
+      # namespace, not only from monitoring.
+      alertmanagerConfigMatcherStrategy:
+        type: None
       resources:
         requests:
           cpu: 10m
@@ -98,25 +98,42 @@ kube-prometheus-stack:
           cpu: 100m
           memory: 128Mi
 
+    # Base route: whatever the Discord route below does not take goes nowhere.
     config:
       route:
         group_by: [namespace, alertname]
-        group_wait: 30s
-        group_interval: 5m
-        repeat_interval: 4h
-        receiver: discord
-        routes:
-          # The stack ships an always-firing heartbeat alert; it proves the
-          # pipeline works but must not reach the channel.
-          - matchers: ['alertname = "Watchdog"']
-            receiver: "null"
+        receiver: "null"
       receivers:
         - name: "null"
-        - name: discord
-          discord_configs:
-            # Reading the URL from the mounted Secret keeps it out of Git.
-            - webhook_url_file: /etc/alertmanager/secrets/alertmanager-discord/webhook-url
-              send_resolved: true
+
+  # Discord route. Unlike plain Alertmanager config, an AlertmanagerConfig can
+  # read the webhook URL from a Secret, so the URL never lands in Git. The
+  # Secret alertmanager-discord is created by hand - see the runbook.
+  extraManifests:
+    - apiVersion: monitoring.coreos.com/v1alpha1
+      kind: AlertmanagerConfig
+      metadata:
+        name: discord
+      spec:
+        route:
+          receiver: discord
+          groupBy: [namespace, alertname]
+          groupWait: 30s
+          groupInterval: 5m
+          repeatInterval: 4h
+          # Our rules are warning/critical; this also skips the always-firing
+          # Watchdog and InfoInhibitor alerts (severity none).
+          matchers:
+            - name: severity
+              matchType: "=~"
+              value: warning|critical
+        receivers:
+          - name: discord
+            discordConfigs:
+              - apiURL:
+                  name: alertmanager-discord
+                  key: webhook-url
+                sendResolved: true
 
   # ---------------------------------------------------------------- grafana
   grafana:
