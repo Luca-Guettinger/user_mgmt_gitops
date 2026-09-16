@@ -151,6 +151,13 @@ kube-prometheus-stack:
     persistence:
       enabled: false
 
+    # Grafana 13 auto-updates its bundled plugins at startup. That directory is
+    # read-only here, so the update unregistered the Prometheus plugin, failed
+    # to replace it, and every panel showed "No data".
+    grafana.ini:
+      plugins:
+        preinstall_disabled: true
+
     nodeSelector:
       workload: monitoring
     resources:
