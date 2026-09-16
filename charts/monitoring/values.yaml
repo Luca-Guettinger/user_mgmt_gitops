@@ -157,7 +157,10 @@ kube-prometheus-stack:
             path: /metrics
             interval: 30s
             relabelings:
-              - sourceLabels: [__meta_kubernetes_pod_ip]
+              # action is the default, but written out: the API server adds
+              # it, and without it Argo CD reports a permanent diff.
+              - action: replace
+                sourceLabels: [__meta_kubernetes_pod_ip]
                 targetLabel: __address__
                 replacement: $1:10254
 
