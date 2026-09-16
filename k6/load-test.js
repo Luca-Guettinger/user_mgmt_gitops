@@ -21,9 +21,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 4 },   // warm up
-        { duration: '3m', target: 8 },   // climb past the HPA threshold
-        { duration: '3m', target: 8 },   // hold, so scale-up settles
+        { duration: '2m', target: 1 },   // warm up
+        { duration: '3m', target: 2 },   // one Argon2 login already saturates a core
+        { duration: '3m', target: 2 },   // hold, so scale-up settles
         { duration: '2m', target: 0 },   // release, then watch scale-down
       ],
       gracefulRampDown: '30s',
