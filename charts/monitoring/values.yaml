@@ -160,13 +160,15 @@ kube-prometheus-stack:
 
     nodeSelector:
       workload: monitoring
+    # 256Mi was only enough while the Prometheus plugin was broken; once
+    # dashboards really query, Grafana 13 was OOMKilled at that limit.
     resources:
       requests:
         cpu: 25m
-        memory: 128Mi
+        memory: 256Mi
       limits:
         cpu: 200m
-        memory: 256Mi
+        memory: 512Mi
 
   # -------------------------------------------------------- state / exporter
   kube-state-metrics:
