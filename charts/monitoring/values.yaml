@@ -154,9 +154,12 @@ kube-prometheus-stack:
     # Grafana 13 auto-updates its bundled plugins at startup. That directory is
     # read-only here, so the update unregistered the Prometheus plugin, failed
     # to replace it, and every panel showed "No data".
+    # Each bundled datasource also runs as its own process (~7-36 MB each).
+    # Only Prometheus is used, so the other twelve are not loaded.
     grafana.ini:
       plugins:
         preinstall_disabled: true
+        disable_plugins: elasticsearch,grafana-postgresql-datasource,grafana-pyroscope-datasource,influxdb,jaeger,loki,mssql,mysql,opentsdb,stackdriver,tempo,zipkin
 
     nodeSelector:
       workload: monitoring
