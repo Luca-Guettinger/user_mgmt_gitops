@@ -22,8 +22,19 @@ backend:
       cpu: 50m
       memory: 160Mi
     limits:
-      cpu: 400m
+      # Argon2 logins are CPU-bound; 400m was not enough to stay responsive
+      # under the k6 load test.
+      cpu: 1000m
       memory: 448Mi
+  # A saturated JVM answers /actuator/health slowly. Without this the liveness
+  # probe restarts a pod that is only busy.
+  probes:
+    readiness:
+      timeoutSeconds: 5
+      failureThreshold: 6
+    liveness:
+      timeoutSeconds: 5
+      failureThreshold: 6
   autoscaling:
     enabled: true
     minReplicas: 1
@@ -72,7 +83,7 @@ namespaceResources:
     hard:
       requests.cpu: 500m
       requests.memory: 768Mi
-      limits.cpu: "2"
+      limits.cpu: "3"
       limits.memory: 2Gi
       pods: "10"
       persistentvolumeclaims: "2"
