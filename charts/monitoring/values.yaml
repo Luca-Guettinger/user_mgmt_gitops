@@ -135,6 +135,26 @@ kube-prometheus-stack:
                   key: webhook-url
                 sendResolved: true
 
+    # Every browser request passes the ingress controller, including the
+    # portal, which has no metrics of its own. Needs --enable-metrics=true on
+    # the controller - a live patch, see OBSERVABILITY-AND-LOADTESTING.md.
+    # Port 10254 is not a named container port, hence portNumber.
+    - apiVersion: monitoring.coreos.com/v1
+      kind: PodMonitor
+      metadata:
+        name: ingress-nginx
+      spec:
+        namespaceSelector:
+          matchNames: [ingress-nginx]
+        selector:
+          matchLabels:
+            app.kubernetes.io/component: controller
+            app.kubernetes.io/name: ingress-nginx
+        podMetricsEndpoints:
+          - portNumber: 10254
+            path: /metrics
+            interval: 30s
+
   # ---------------------------------------------------------------- grafana
   grafana:
     # Our own dashboards are the deliverable; the ~30 bundled ones cost
