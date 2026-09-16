@@ -138,7 +138,9 @@ kube-prometheus-stack:
     # Every browser request passes the ingress controller, including the
     # portal, which has no metrics of its own. Needs --enable-metrics=true on
     # the controller - a live patch, see OBSERVABILITY-AND-LOADTESTING.md.
-    # Port 10254 is not a named container port, hence portNumber.
+    # Metrics listen on 10254, which the controller does not declare as a
+    # container port, so the pod is found through "http" and the scrape
+    # address is rewritten to 10254.
     - apiVersion: monitoring.coreos.com/v1
       kind: PodMonitor
       metadata:
@@ -151,9 +153,13 @@ kube-prometheus-stack:
             app.kubernetes.io/component: controller
             app.kubernetes.io/name: ingress-nginx
         podMetricsEndpoints:
-          - portNumber: 10254
+          - port: http
             path: /metrics
             interval: 30s
+            relabelings:
+              - sourceLabels: [__meta_kubernetes_pod_ip]
+                targetLabel: __address__
+                replacement: $1:10254
 
   # ---------------------------------------------------------------- grafana
   grafana:
