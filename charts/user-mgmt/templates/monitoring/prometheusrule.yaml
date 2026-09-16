@@ -37,12 +37,14 @@ spec:
               requests have returned 5xx for {{ $r.for }}. New users cannot sign up.
               Usual cause: the database is unreachable.
 
-        # The broad safety net across every endpoint.
+        # The broad safety net across every endpoint. Probe and scrape traffic
+        # is excluded: it is the most frequent request by far and would
+        # otherwise dilute the ratio. Same filter the dashboards use.
         - alert: UserMgmtBackendHighErrorRate
           expr: >-
-            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}",outcome="SERVER_ERROR"}[5m]))
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}",uri!~"/actuator.*",outcome="SERVER_ERROR"}[5m]))
             /
-            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}"}[5m]))
+            sum(rate(http_server_requests_seconds_count{namespace="{{ $ns }}",job="{{ $job }}",uri!~"/actuator.*"}[5m]))
             > {{ $r.errorRatio }}
           for: {{ $r.for }}
           labels:

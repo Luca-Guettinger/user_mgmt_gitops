@@ -49,16 +49,17 @@ backend:
       cpu: 500m
       memory: 640Mi
   probes:
-    # Spring Security in this app permits /actuator/health only - the
-    # /readiness and /liveness sub-groups answer 403 - so both probes
-    # use the same path.
+    # Boot's probe groups: liveness = livenessState, readiness =
+    # readinessState. Neither includes the database, so a lost DB surfaces
+    # as 5xx and an alert instead of pods going NotReady. Requires
+    # management.endpoint.health.probes.enabled in the application.
     #
     # The JVM needs ~110s to boot on a 1-vCPU node. The startup probe holds
     # readiness and liveness off until it answers, so a slow boot is not
     # mistaken for a hung process and killed.
     startup:
       enabled: true
-      path: /actuator/health
+      path: /actuator/health/readiness
       initialDelaySeconds: 10
       periodSeconds: 10
       timeoutSeconds: 3
@@ -66,18 +67,18 @@ backend:
       failureThreshold: 30
     readiness:
       enabled: true
-      path: /actuator/health
+      path: /actuator/health/readiness
       initialDelaySeconds: 20
       periodSeconds: 10
-      timeoutSeconds: 3
+      timeoutSeconds: 5
       failureThreshold: 3
     liveness:
       enabled: true
-      path: /actuator/health
+      path: /actuator/health/liveness
       initialDelaySeconds: 60
       periodSeconds: 20
-      timeoutSeconds: 3
-      failureThreshold: 3
+      timeoutSeconds: 5
+      failureThreshold: 6
   autoscaling:
     enabled: false
     minReplicas: 2

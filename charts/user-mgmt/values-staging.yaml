@@ -8,7 +8,7 @@
 global:
   # Pinned by hand: the pipeline only bumps prod, and a reused tag such as
   # latest never triggers a rollout.
-  imageTag: sha-a02ab9bbce06579f341345eaf80a0db487e13466
+  imageTag: sha-6b2a9ce91b1ace8febc2ca74066929b012a77a8f
   labels:
     environment: staging
 
@@ -19,22 +19,15 @@ backend:
     JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=96m"
   resources:
     requests:
-      cpu: 50m
+      # The HPA measures against this. At 50m against a 1000m limit it
+      # reported ~1980% of an 80% target, so scaling was all-or-nothing.
+      cpu: 300m
       memory: 160Mi
     limits:
       # Argon2 logins are CPU-bound; 400m was not enough to stay responsive
       # under the k6 load test.
       cpu: 1000m
       memory: 448Mi
-  # A saturated JVM answers /actuator/health slowly. Without this the liveness
-  # probe restarts a pod that is only busy.
-  probes:
-    readiness:
-      timeoutSeconds: 5
-      failureThreshold: 6
-    liveness:
-      timeoutSeconds: 5
-      failureThreshold: 6
   autoscaling:
     enabled: true
     minReplicas: 1
@@ -81,7 +74,7 @@ namespaceResources:
   resourceQuota:
     enabled: true
     hard:
-      requests.cpu: 500m
+      requests.cpu: "1"
       requests.memory: 768Mi
       limits.cpu: "3"
       limits.memory: 2Gi

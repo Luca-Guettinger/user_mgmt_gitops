@@ -17,8 +17,8 @@
 #     new replica gets no traffic. The HPA still reacts, because it averages
 #     CPU across pods, but the per-pod CPU column will stay lopsided. That is
 #     the tool, not your chart.
-#   * /actuator/health is the only endpoint Spring Security permits here;
-#     everything else answers 403. Override with -p if that changes.
+#   * /actuator/health and its liveness/readiness sub-groups are the endpoints
+#     Spring Security permits here; everything else answers 403. Override with -p.
 #   * Expect roughly: load starts -> CPU pegs at the container limit within
 #     ~20s -> HPA reports it after a 15s sync -> a replica is added ~60s later
 #     (the scaleUp stabilization window). Anything under -d 120 ends too early.
