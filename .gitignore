@@ -7,3 +7,13 @@ rendered/
 
 # IDE
 .idea/
+
+# Local agent guidance
+CLAUDE.md
+# Terraform (state holds cluster credentials, never commit)
+terraform/.terraform/
+*.tfstate
+*.tfstate.*
+*.tfvars
+crash.log
+/docs
