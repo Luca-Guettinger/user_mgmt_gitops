@@ -51,7 +51,7 @@ frontend:
   config:
     # Baked into the Next.js image at build time - rebuild the image when
     # this changes.
-    NEXT_PUBLIC_API_URL: https://vsc.notenverwaltung.ch/backend
+    NEXT_PUBLIC_API_URL: https://tf.nightnode.io/backend
 
 postgres:
   auth:
@@ -104,10 +104,10 @@ metrics:
 ingress:
   enabled: true
   className: nginx
-  host: vsc.notenverwaltung.ch
+  host: tf.nightnode.io
   tls:
     enabled: true
-    secretName: vsc-notenverwaltung-tls
+    secretName: tf-nightnode-tls
     clusterIssuer: letsencrypt-prod
 
 certManager:
