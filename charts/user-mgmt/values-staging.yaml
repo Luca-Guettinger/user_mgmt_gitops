@@ -70,7 +70,9 @@ postgres:
       memory: 128Mi
     limits:
       cpu: 300m
-      memory: 256Mi
+      # 256Mi was OOMKilled 7 times during the 2026-09-18 load test, which
+      # emptied the connection pool and made every request wait 30s.
+      memory: 384Mi
 
 namespaceResources:
   resourceQuota:
@@ -78,7 +80,9 @@ namespaceResources:
     hard:
       requests.cpu: "1"
       requests.memory: 768Mi
-      limits.cpu: "3"
+      # 4, not 3: at HPA max a rolling update needs room for a surge pod,
+      # otherwise the ReplicaSet is stuck on "exceeded quota".
+      limits.cpu: "4"
       limits.memory: 2Gi
       pods: "10"
       persistentvolumeclaims: "2"
