@@ -57,6 +57,9 @@ frontend:
     NEXT_PUBLIC_API_URL: http://localhost:8080/backend
 
 postgres:
+  # Alert demo (runbook step 7): 0 takes the database away, so registration
+  # returns 500 and UserMgmtRegistrationFailing fires. Revert to 1 after.
+  replicas: 0
   auth:
     password: staging-change-me
   persistence:
