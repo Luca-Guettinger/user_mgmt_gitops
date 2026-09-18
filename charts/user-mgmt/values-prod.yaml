@@ -12,25 +12,25 @@ backend:
     type: ClusterIP
   config:
     # Cap the JVM heap. The small nodes have ~1465Mi allocatable each and
-    # the HPA may run three of these at once.
+    # the HPA may run four of these at once.
     JAVA_TOOL_OPTIONS: "-Xmx256m -XX:MaxMetaspaceSize=128m"
   resources:
     requests:
-      cpu: 100m
+      cpu: 250m
       # Deliberately below what the JVM actually uses: this only reserves
       # scheduling room, and the HPA measures utilisation against it.
       # The limit below is what actually caps the container.
       memory: 224Mi
     limits:
-      cpu: 500m
+      cpu: 1000m
       memory: 640Mi
   autoscaling:
     enabled: true
     # Two replicas is the floor: it is what makes the PDB meaningful and lets
     # a rolling update happen without a gap in service.
     minReplicas: 2
-    # Three is the ceiling the node pool can actually schedule.
-    maxReplicas: 3
+    # Four is the ceiling the node pool can actually schedule.
+    maxReplicas: 4
     targetCPUUtilizationPercentage: 70
   pdb:
     enabled: true
@@ -69,21 +69,21 @@ postgres:
   resources:
     requests:
       cpu: 50m
-      memory: 128Mi
+      memory: 256Mi
     limits:
       cpu: 500m
-      memory: 256Mi
+      memory: 512Mi
 
 namespaceResources:
   resourceQuota:
     enabled: true
-    # Sized for the HPA at full stretch (3 backend) plus one surge pod during
+    # Sized for the HPA at full stretch (4 backend) plus one surge pod during
     # a rolling update, with headroom.
     hard:
-      requests.cpu: "1"
+      requests.cpu: "2"
       requests.memory: 1536Mi
-      limits.cpu: "4"
-      limits.memory: 4Gi
+      limits.cpu: "6"
+      limits.memory: 5Gi
       pods: "15"
       persistentvolumeclaims: "2"
   limitRange:
@@ -92,8 +92,8 @@ namespaceResources:
 networkPolicy:
   enabled: true
   monitoringNamespace: monitoring
-  # Deliberately empty: no load generator may reach the live site.
-  loadTestNamespace: ""
+  # The k6 Job may reach the backend Service: the load test runs against prod.
+  loadTestNamespace: k6
 
 metrics:
   serviceMonitor:
