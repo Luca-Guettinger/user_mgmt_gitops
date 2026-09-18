@@ -5,14 +5,14 @@
 //
 // The rate is controlled by the sleep, not by piling up VUs. One register
 // costs ~0.22s of CPU, so a core does ~4.5/s; the numbers below aim at
-// roughly 2.7/s, comfortably past 80% of the 300m request and far below the
-// 1000m limit.
+// roughly 2.6/s, which holds the backend near 110% of the 300m request and
+// far below the 1000m limit.
 //
-// GET /users/me is deliberately NOT the load endpoint: on 2026-09-18 it took
-// ~9s per call with no load at all and held a pool connection for that whole
-// time, so 10 connections were gone and every request hit the 30s Hikari
-// timeout. That is an application bug (it is also the portal's slow
-// /api/me); until it is fixed, a read-driven test measures only the bug.
+// GET /users/me is not the load endpoint: it costs ~43ms server-side, so it
+// takes far more VUs to move the HPA than the node has room for, and because
+// spring.jpa.open-in-view holds a pool connection for the whole request, a
+// read-driven ramp exhausts the 10 connections and everything hits the 30s
+// Hikari timeout long before CPU becomes the limit.
 //
 // With the database scaled to 0, every registration fails - that is the
 // failing traffic the alert demo needs (runbook step 7).
@@ -33,7 +33,7 @@ export const options = {
       startVUs: 0,
       stages: [
         { duration: '2m', target: 3 },   // warm up
-        { duration: '3m', target: 9 },   // ~4/s: the troughs have to stay above
+        { duration: '3m', target: 9 },   // ~2.6/s: the troughs have to stay above
         { duration: '3m', target: 9 },   // the 80% target, not just the peaks
         { duration: '2m', target: 0 },   // release, then watch scale-down
       ],
