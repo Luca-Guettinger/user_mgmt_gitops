@@ -1,23 +1,28 @@
 // Controlled, increasing load against the user_mgmt_service.
 //
-// Each VU registers and logs in ONCE and then loops on the read endpoint:
-//   POST /users/register + POST /users/login   (once per VU)
-//   GET  /users/me                             (every iteration)
+// Every iteration registers one user: the write path, CPU-bound through
+// Argon2 (16 MiB, see Encoders.java), which is what moves the HPA.
 //
-// Runs 1-4 logged in on every iteration. Argon2 (16 MiB, see Encoders.java)
-// then ate the whole CPU limit, the container could not answer its probes in
-// time and both replicas went NotReady during the scale-up - the opposite of
-// what Aufgabe 2 asks for. Hashing once per VU still loads the HPA over its
-// 70% target, but leaves the pod responsive.
+// The rate is controlled by the sleep, not by piling up VUs. One register
+// costs ~0.22s of CPU, so a core does ~4.5/s; the numbers below aim at
+// roughly 2.7/s, comfortably past 80% of the 300m request and far below the
+// 1000m limit.
+//
+// GET /users/me is deliberately NOT the load endpoint: on 2026-09-18 it took
+// ~9s per call with no load at all and held a pool connection for that whole
+// time, so 10 connections were gone and every request hit the 30s Hikari
+// timeout. That is an application bug (it is also the portal's slow
+// /api/me); until it is fixed, a read-driven test measures only the bug.
+//
+// With the database scaled to 0, every registration fails - that is the
+// failing traffic the alert demo needs (runbook step 7).
 
 import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL;
 const PASSWORD = 'k6-load-test-password';
-
-// Per-VU state: k6 keeps module scope alive across the iterations of one VU.
-let token = null;
+const json = { headers: { 'Content-Type': 'application/json' } };
 
 export const options = {
   // Applied to every metric, so one Grafana dashboard can isolate one run.
@@ -27,9 +32,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 4 },   // warm up
-        { duration: '3m', target: 12 },  // read traffic is cheap, so it takes more VUs
-        { duration: '3m', target: 12 },  // hold, so scale-up settles
+        { duration: '2m', target: 3 },   // warm up
+        { duration: '3m', target: 9 },   // ~4/s: the troughs have to stay above
+        { duration: '3m', target: 9 },   // the 80% target, not just the peaks
         { duration: '2m', target: 0 },   // release, then watch scale-down
       ],
       gracefulRampDown: '30s',
@@ -44,56 +49,19 @@ export const options = {
   },
 };
 
-// Returns the JWT, or null if the sign-up flow failed - then the next
-// iteration tries again. That retry is what makes the alert demo work: with
-// the database scaled to zero, every iteration produces a failing register.
-function signUp() {
-  const email = `k6-${__VU}-${Date.now()}@loadtest.local`;
-  const json = { headers: { 'Content-Type': 'application/json' } };
-
-  const registered = http.post(
+function register(email) {
+  return http.post(
     `${BASE_URL}/users/register`,
     JSON.stringify({ firstName: 'k6', lastName: 'Tester', email, password: PASSWORD }),
     { ...json, tags: { name: 'register' } },
   );
-  check(registered, { 'register -> 201': (r) => r.status === 201 });
-  if (registered.status !== 201) return null;
-
-  const loggedIn = http.post(
-    `${BASE_URL}/users/login`,
-    JSON.stringify({ email, password: PASSWORD }),
-    { ...json, tags: { name: 'login' } },
-  );
-  // The JWT comes back in the Authorization *response* header, not the body.
-  const jwt = loggedIn.headers['Authorization'];
-  check(loggedIn, {
-    'login -> 200': (r) => r.status === 200,
-    'login returns a token': () => !!jwt,
-  });
-
-  return jwt || null;
 }
 
 export default function () {
-  if (!token) {
-    token = signUp();
-    if (!token) {
-      // Back off. Registration hashes with Argon2 before it ever touches the
-      // database, so retrying hard during an outage is itself a load test -
-      // that is what pinned both pods at their CPU limit on 2026-09-18.
-      sleep(5);
-      return;
-    }
-  }
+  // Unique per iteration: email is UNIQUE NOT NULL, and a duplicate raises an
+  // unhandled DataIntegrityViolationException, which would show up as a 500.
+  const registered = register(`k6-${__VU}-${__ITER}-${Date.now()}@loadtest.local`);
+  check(registered, { 'register -> 201': (r) => r.status === 201 });
 
-  const me = http.get(`${BASE_URL}/users/me`, {
-    headers: { Authorization: token },
-    tags: { name: 'me' },
-  });
-  check(me, { 'me -> 200': (r) => r.status === 200 });
-
-  // A token outlives the run, so a 401 means the pod rejected it - start over.
-  if (me.status === 401) token = null;
-
-  sleep(0.5);
+  sleep(2);
 }
