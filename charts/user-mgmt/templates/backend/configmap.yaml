@@ -8,8 +8,10 @@ metadata:
   labels:
     {{- include "user-mgmt.labels" $ctx | nindent 4 }}
 data:
+  {{- if not .Values.externalDatabase.secretName }}
   # Built from the postgres values so it always points at the Postgres Service.
   SPRING_DATASOURCE_URL: {{ include "user-mgmt.datasourceUrl" . | quote }}
+  {{- end }}
   {{- range $key, $value := .Values.backend.config }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

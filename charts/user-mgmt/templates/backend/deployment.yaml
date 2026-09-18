@@ -34,13 +34,20 @@ spec:
           ports:
             - name: http
               containerPort: {{ .Values.backend.containerPort }}
+          {{- if not .Values.externalDatabase.secretName }}
           env:
             {{- include "user-mgmt.dbCredentialEnv" (dict "root" . "userVar" "SPRING_DATASOURCE_USERNAME" "passwordVar" "SPRING_DATASOURCE_PASSWORD") | nindent 12 }}
+          {{- end }}
           envFrom:
             - configMapRef:
                 name: {{ include "user-mgmt.componentName" $ctx }}
             - secretRef:
                 name: {{ include "user-mgmt.componentName" $ctx }}
+            {{- with .Values.externalDatabase.secretName }}
+            # URL, username and password of the managed database.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
           {{- if .Values.backend.probes.startup.enabled }}
           # Holds the other two probes off until the app has finished booting.
           startupProbe:

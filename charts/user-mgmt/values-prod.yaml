@@ -63,26 +63,13 @@ frontend:
     # this changes.
     NEXT_PUBLIC_API_URL: https://tf.nightnode.io/backend
 
+# The database is the managed Postgres from terraform/database.tf. The Secret
+# is created by hand from `terraform output` (../../SECRETS-RUNBOOK.md).
+externalDatabase:
+  secretName: user-mgmt-prod-db
+
 postgres:
-  auth:
-    # TODO: replace with a real secret (Sealed Secrets / SOPS / External Secrets).
-    password: aed8e71486da7ef9ad8322c362a6279e
-  persistence:
-    enabled: true
-    # Block storage is billed at 0.10 USD per GiB per month, 1 GiB minimum.
-    size: 1Gi
-    # Plain do-block-storage has reclaimPolicy Delete: removing the PVC also
-    # removes the volume, so nothing keeps billing after the cluster is gone.
-    # Switch to do-block-storage-retain (+ keepOnDelete: true) for real data.
-    storageClass: do-block-storage
-    keepOnDelete: false
-  resources:
-    requests:
-      cpu: 50m
-      memory: 256Mi
-    limits:
-      cpu: 500m
-      memory: 512Mi
+  enabled: false
 
 namespaceResources:
   resourceQuota:

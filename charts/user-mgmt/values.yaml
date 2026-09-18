@@ -37,6 +37,9 @@ backend:
     JWT_ISSUER: user-mgmt-service
     JWT_EXPIRATION_MILLIS: "3600000"
     SPRING_JPA_HIBERNATE_DDL_AUTO: update
+    # spring.jpa.open-in-view: without this a request holds its DB connection
+    # until the response is written, Argon2 included, and the pool runs dry.
+    SPRING_JPA_OPENINVIEW: "false"
   secrets:
     # Must be valid Base64: the backend runs Decoders.BASE64.decode() on this
     # and hands the bytes to Keys.hmacShaKeyFor.
@@ -158,6 +161,12 @@ frontend:
     minAvailable: 1
 
 # -------------------------------------------------------------------- postgres
+# A database outside the cluster, e.g. DO managed Postgres (Aufgabe 4).
+# Name of a hand-made Secret with SPRING_DATASOURCE_URL, _USERNAME and
+# _PASSWORD. Set it together with postgres.enabled: false.
+externalDatabase:
+  secretName: ""
+
 postgres:
   enabled: true
   # 1 or 0; see the comment in templates/postgres/deployment.yaml.

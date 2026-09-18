@@ -56,23 +56,13 @@ frontend:
     # the browser calls the API on localhost.
     NEXT_PUBLIC_API_URL: http://localhost:8080/backend
 
+# The database is the managed Postgres from terraform/database.tf. The Secret
+# is created by hand from `terraform output` (../../SECRETS-RUNBOOK.md).
+externalDatabase:
+  secretName: user-mgmt-staging-db
+
 postgres:
-  auth:
-    password: staging-change-me
-  persistence:
-    enabled: true
-    size: 1Gi
-    storageClass: do-block-storage
-    keepOnDelete: false
-  resources:
-    requests:
-      cpu: 50m
-      memory: 128Mi
-    limits:
-      cpu: 300m
-      # 256Mi was OOMKilled 7 times during the 2026-09-18 load test, which
-      # emptied the connection pool and made every request wait 30s.
-      memory: 384Mi
+  enabled: false
 
 namespaceResources:
   resourceQuota:

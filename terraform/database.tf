@@ -36,6 +36,12 @@ resource "digitalocean_database_user" "env" {
   for_each   = toset(var.environments)
   cluster_id = digitalocean_database_cluster.pg.id
   name       = "user_mgmt_${each.key}"
+
+  # The API returns an empty settings block, which plan would otherwise
+  # "remove" on every run.
+  lifecycle {
+    ignore_changes = [settings]
+  }
 }
 
 # Everything the Secrets need except the passwords, which stay sensitive:
