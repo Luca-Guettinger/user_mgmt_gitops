@@ -1,5 +1,5 @@
-# Defaults are the live values of the running cluster. No secrets here: the
-# token stays in the environment (see provider.tf), never in a variable.
+# Defaults are the live values, so `plan` needs no .tfvars.
+# The DO token is not a variable - it comes from DIGITALOCEAN_TOKEN.
 
 variable "cluster_name" {
   type    = string
@@ -17,7 +17,7 @@ variable "kubernetes_version" {
 }
 
 variable "node_size" {
-  description = "One size for all three pools, so app/mon/pool run identical nodes."
+  description = "One size for all three pools."
   type        = string
   default     = "s-2vcpu-4gb"
 }

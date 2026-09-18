@@ -11,7 +11,8 @@ rendered/
 # Local agent guidance
 CLAUDE.md
 # Terraform (state holds cluster credentials, never commit)
-terraform/.terraform/
+terraform*/.terraform/
+terraform*/.env
 *.tfstate
 *.tfstate.*
 *.tfvars
