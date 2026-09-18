@@ -21,6 +21,9 @@ import http from 'k6/http';
 import { check, sleep } from 'k6';
 
 const BASE_URL = __ENV.BASE_URL;
+// VUs at the peak. 9 is the gentle HPA demo (~2.6/s); run.sh -p raises it
+// for a stress test (25 is ~8/s, close to what two app nodes can hash).
+const PEAK = Number(__ENV.PEAK_VUS || 9);
 const PASSWORD = 'k6-load-test-password';
 const json = { headers: { 'Content-Type': 'application/json' } };
 
@@ -32,9 +35,9 @@ export const options = {
       executor: 'ramping-vus',
       startVUs: 0,
       stages: [
-        { duration: '2m', target: 3 },   // warm up
-        { duration: '3m', target: 9 },   // ~2.6/s: the troughs have to stay above
-        { duration: '3m', target: 9 },   // the 80% target, not just the peaks
+        { duration: '2m', target: Math.ceil(PEAK / 3) },   // warm up
+        { duration: '3m', target: PEAK },  // the troughs have to stay above
+        { duration: '3m', target: PEAK },  // the HPA target, not just the peaks
         { duration: '2m', target: 0 },   // release, then watch scale-down
       ],
       gracefulRampDown: '30s',

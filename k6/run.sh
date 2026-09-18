@@ -4,6 +4,7 @@
 #
 #   ./k6/run.sh                          # staging, the default target
 #   ./k6/run.sh -u https://tf.nightnode.io/backend --yes-really-prod
+#   ./k6/run.sh ... -p 25                # stress: 25 VUs at the peak (default 9)
 #
 # What it does: rebuilds the ConfigMap from k6/load-test.js, replaces the Job,
 # and tails its logs. Watch the "k6 Load Test" dashboard in Grafana while it
@@ -24,15 +25,17 @@ set -euo pipefail
 NAMESPACE_K6="k6"
 TARGET="http://user-mgmt-staging-backend.user-mgmt-staging.svc.cluster.local:8080"
 TEST_ID="$(date +%Y%m%d-%H%M%S)"
+PEAK_VUS=9
 ALLOW_PROD=0
 FOLLOW=1
 
-usage() { sed -n '2,24p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'; exit 0; }
+usage() { sed -n '2,25p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'; exit 0; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
     -u|--url)          TARGET="$2"; shift 2 ;;
     -t|--test-id)      TEST_ID="$2"; shift 2 ;;
+    -p|--peak-vus)     PEAK_VUS="$2"; shift 2 ;;
     --no-follow)       FOLLOW=0; shift ;;
     --yes-really-prod) ALLOW_PROD=1; shift ;;
     -h|--help)         usage ;;
@@ -71,6 +74,7 @@ kubectl -n "$NAMESPACE_K6" create configmap k6-script \
 kubectl -n "$NAMESPACE_K6" create configmap k6-config \
   --from-literal=BASE_URL="$TARGET" \
   --from-literal=TEST_ID="$TEST_ID" \
+  --from-literal=PEAK_VUS="$PEAK_VUS" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Same reason: a re-run means deleting the old Job first.

@@ -40,6 +40,9 @@ backend:
     # spring.jpa.open-in-view: without this a request holds its DB connection
     # until the response is written, Argon2 included, and the pool runs dry.
     SPRING_JPA_OPENINVIEW: "false"
+    # The managed Postgres has ~22 connection slots; Hikari opens 10 per pod by
+    # default. 3 is plenty with open-in-view off and fits prod (4) + staging (2).
+    SPRING_DATASOURCE_HIKARI_MAXIMUMPOOLSIZE: "3"
   secrets:
     # Must be valid Base64: the backend runs Decoders.BASE64.decode() on this
     # and hands the bytes to Keys.hmacShaKeyFor.
