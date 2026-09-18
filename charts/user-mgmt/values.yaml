@@ -91,6 +91,8 @@ backend:
     # permits zero disruptions and blocks node drains.
     enabled: false
     minAvailable: 1
+  # Where the pods may run, e.g. to keep them off the monitoring node.
+  affinity: {}
 
 # -------------------------------------------------------------------- frontend
 frontend:

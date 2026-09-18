@@ -17,10 +17,9 @@ backend:
   resources:
     requests:
       cpu: 250m
-      # Deliberately below what the JVM actually uses: this only reserves
-      # scheduling room, and the HPA measures utilisation against it.
-      # The limit below is what actually caps the container.
-      memory: 224Mi
+      # Close to what the JVM really uses (~250-430Mi), so the scheduler
+      # only places a pod where it actually fits.
+      memory: 384Mi
     limits:
       cpu: 1000m
       memory: 640Mi
@@ -35,6 +34,17 @@ backend:
   pdb:
     enabled: true
     minAvailable: 1
+  # Keep the backend off the monitoring node. The scheduler only sees
+  # requests, and Grafana, Prometheus and Argo CD use far more memory than
+  # they request, so that node looks empty on paper while it is full.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: workload
+                operator: NotIn
+                values: [monitoring]
 
 frontend:
   # One replica is enough: this is a school project, not an HA deployment.
@@ -81,7 +91,7 @@ namespaceResources:
     # a rolling update, with headroom.
     hard:
       requests.cpu: "2"
-      requests.memory: 1536Mi
+      requests.memory: 2560Mi
       limits.cpu: "6"
       limits.memory: 5Gi
       pods: "15"
