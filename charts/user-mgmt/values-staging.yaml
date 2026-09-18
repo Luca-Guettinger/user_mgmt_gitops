@@ -16,7 +16,7 @@ backend:
   service:
     type: ClusterIP
   config:
-    JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=96m"
+    JAVA_TOOL_OPTIONS: "-Xmx192m -XX:MaxMetaspaceSize=128m"
   resources:
     requests:
       # The HPA measures against this. At 50m against a 1000m limit it
@@ -27,7 +27,9 @@ backend:
       # Argon2 logins are CPU-bound; 400m was not enough to stay responsive
       # under the k6 load test.
       cpu: 1000m
-      memory: 448Mi
+      # 192m heap + 128m metaspace + JVM overhead; 448Mi was too tight and a
+      # pod died of OutOfMemoryError: Metaspace during the 2026-09-18 run.
+      memory: 512Mi
   autoscaling:
     enabled: true
     minReplicas: 1

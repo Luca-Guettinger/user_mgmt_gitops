@@ -3,7 +3,7 @@
 # Run the k6 load test in the cluster and follow it.
 #
 #   ./k6/run.sh                          # staging, the default target
-#   ./k6/run.sh -u https://vsc.notenverwaltung.ch/backend --yes-really-prod
+#   ./k6/run.sh -u https://tf.nightnode.io/backend --yes-really-prod
 #
 # What it does: rebuilds the ConfigMap from k6/load-test.js, replaces the Job,
 # and tails its logs. Watch the "k6 Load Test" dashboard in Grafana while it
@@ -16,8 +16,8 @@
 #     to one pod.
 #   * The run takes 10 minutes by design: hpa.yaml waits 60s of sustained load
 #     before scaling up and 300s of quiet before scaling back down.
-#   * Every iteration registers a new user. Clean up afterwards with the
-#     DELETE in the runbook if the rows get in the way.
+#   * Each VU registers one user and then loops on GET /users/me. Clean up
+#     afterwards with the DELETE in the runbook if the rows get in the way.
 
 set -euo pipefail
 
@@ -46,7 +46,7 @@ command -v kubectl >/dev/null || die "kubectl not found"
 cd "$(dirname "$0")/.."
 
 case "$TARGET" in
-  *user-mgmt-prod*|*vsc.notenverwaltung.ch*)
+  *user-mgmt-prod*|*tf.nightnode.io*)
     [ "$ALLOW_PROD" -eq 1 ] || die "refusing to load-test PRODUCTION ($TARGET).
        It serves the live site. Pass --yes-really-prod if that is what you want."
     echo "!!  PRODUCTION target: $TARGET" ;;
