@@ -64,7 +64,7 @@ frontend:
     NEXT_PUBLIC_API_URL: https://tf.nightnode.io/backend
 
 moduleService:
-  enabled: false
+  enabled: true
   database:
     secretName: module-service-db
   # Vertical scaling (Aufgabe 6): one replica, sized so it stays stable
