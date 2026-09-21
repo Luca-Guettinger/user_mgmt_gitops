@@ -21,6 +21,19 @@ kyverno:
   admissionController:
     replicas: 1
 
+  # Upstream bug in kyverno 3.9.1: the CRDs of the policies.kyverno.io group
+  # render with empty `labels: {}` / `annotations: {}`. Kubernetes drops empty
+  # maps, so ArgoCD compares a field that exists in Git but never in the
+  # cluster and shows those 11 CRDs as permanently OutOfSync. One real label
+  # makes both sides agree.
+  # These CRDs come from the kyverno-api subchart, whose keys are labels and
+  # annotations (not crds.customLabels, which only covers the older group).
+  kyverno-api:
+    labels:
+      app.kubernetes.io/part-of: kyverno
+    annotations:
+      app.kubernetes.io/managed-by: Helm
+
   backgroundController:
     enabled: false
 
