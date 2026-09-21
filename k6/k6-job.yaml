@@ -31,7 +31,9 @@ spec:
       restartPolicy: Never
       containers:
         - name: k6
-          image: grafana/k6:latest
+          # Pinned, not :latest - the disallow-latest-tag ClusterPolicy
+          # rejects a pod with a moving tag (charts/policy).
+          image: grafana/k6:2.2.0
           args:
             - run
             - /scripts/load-test.js

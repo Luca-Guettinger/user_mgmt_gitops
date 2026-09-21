@@ -1,0 +1,14 @@
+apiVersion: v2
+name: policy
+description: Policy as Code - Kyverno plus the ClusterPolicies this platform enforces
+type: application
+version: 0.1.0
+appVersion: "1.0.0"
+
+# Same shape as charts/monitoring: one upstream chart as a dependency, our own
+# configuration and rules in this repository, rendered by ArgoCD as one
+# Application. Install and rules therefore travel in the same commit.
+dependencies:
+  - name: kyverno
+    version: "3.9.1"
+    repository: https://kyverno.github.io/kyverno/

@@ -1,0 +1,37 @@
+# ArgoCD renders charts/policy - Kyverno plus our three ClusterPolicies - into
+# the "policy" namespace. Same options as the monitoring Application, for the
+# same reason: the chart ships CRDs.
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: policy
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: platform
+  source:
+    repoURL: https://github.com/Luca-Guettinger/user_mgmt_gitops.git
+    targetRevision: main
+    path: charts/policy
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: policy
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true
+      # The 22 Kyverno CRDs are larger than the 262144-byte annotation that
+      # client-side apply writes.
+      - ServerSideApply=true
+      # The first sync applies the CRDs and the ClusterPolicies that use them
+      # in one pass.
+      - SkipDryRunOnMissingResource=true
+    retry:
+      limit: 5
+      backoff:
+        duration: 10s
+        factor: 2
+        maxDuration: 3m

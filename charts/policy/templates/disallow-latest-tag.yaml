@@ -1,0 +1,50 @@
+# Images must carry a real tag, and it must not be "latest".
+#
+# "latest" moves: two pods of the same Deployment can run different code, and a
+# restart silently changes the version. Our own pipeline already deploys by
+# commit (sha-<commit>), which is what this rule protects.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-latest-tag
+spec:
+  background: false
+  failurePolicy: Fail
+  rules:
+    - name: require-an-image-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - user-mgmt
+                - user-mgmt-staging
+                - k6
+      validate:
+        failureAction: Enforce
+        message: >-
+          Images must carry a tag
+          (use a version or the sha-<commit> tag the pipeline builds).
+        pattern:
+          spec:
+            containers:
+              # "*:*" means: there is a tag. The next rule excludes "latest".
+              - image: "*:*"
+    - name: reject-the-latest-tag
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - user-mgmt
+                - user-mgmt-staging
+                - k6
+      validate:
+        failureAction: Enforce
+        message: 'Images must not use the "latest" tag.'
+        pattern:
+          spec:
+            containers:
+              - image: "!*:latest"

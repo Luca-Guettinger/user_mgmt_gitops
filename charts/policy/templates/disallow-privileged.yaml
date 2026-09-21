@@ -1,0 +1,35 @@
+# No privileged containers, and no way to become privileged later.
+#
+# A privileged container has the host's kernel capabilities and can read the
+# node's disks and network - on a three-node cluster that is every other
+# workload, including the database credentials in the other namespaces.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: disallow-privileged
+spec:
+  background: false
+  failurePolicy: Fail
+  rules:
+    - name: no-privileged-containers
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              namespaces:
+                - user-mgmt
+                - user-mgmt-staging
+                - k6
+      validate:
+        failureAction: Enforce
+        message: >-
+          privileged and allowPrivilegeEscalation must not be true.
+        pattern:
+          spec:
+            containers:
+              # "=(...)" is a conditional anchor: only checked when the field
+              # exists, so a pod that sets no securityContext at all passes.
+              - =(securityContext):
+                  =(privileged): "false"
+                  =(allowPrivilegeEscalation): "false"

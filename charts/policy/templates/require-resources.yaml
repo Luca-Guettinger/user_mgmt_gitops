@@ -1,0 +1,47 @@
+# Every container must declare CPU and memory requests and limits.
+#
+# Requests are what the scheduler places a pod by, limits are what caps it. A
+# pod without them is invisible to the scheduler and unbounded at runtime -
+# exactly how the backend pods filled the monitoring node on 2026-09-18.
+apiVersion: kyverno.io/v1
+kind: ClusterPolicy
+metadata:
+  name: require-resources
+spec:
+  # No background scans: the reports and background controllers are disabled
+  # (see values.yaml), so the rule only runs on create and update.
+  background: false
+  # If Kyverno is unreachable, the API server rejects the request rather than
+  # letting it through unchecked.
+  failurePolicy: Fail
+  rules:
+    - name: require-requests-and-limits
+      match:
+        any:
+          - resources:
+              kinds:
+                - Pod
+              # Only our own namespaces. The platform namespaces (kube-system,
+              # monitoring, argocd, ingress-nginx, cert-manager, policy) are
+              # deliberately left alone: their charts are not ours to fix.
+              namespaces:
+                - user-mgmt
+                - user-mgmt-staging
+                - k6
+      validate:
+        # Enforce = reject. The alternative, Audit, would only record it.
+        failureAction: Enforce
+        message: >-
+          Every container needs resources.requests.cpu/memory and
+          resources.limits.cpu/memory.
+        pattern:
+          spec:
+            containers:
+              # "?*" means: present and not empty.
+              - resources:
+                  requests:
+                    cpu: "?*"
+                    memory: "?*"
+                  limits:
+                    cpu: "?*"
+                    memory: "?*"

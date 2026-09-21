@@ -1,0 +1,31 @@
+# Configuration for the kyverno dependency. Everything not listed here keeps
+# the upstream default.
+#
+# The cluster has three s-2vcpu-4gb nodes, so only the part of Kyverno that
+# actually enforces the policies runs: the admission controller, which the API
+# server calls before a resource is created. The other three controllers are
+# off, which is 1 pod instead of 4:
+#
+#   backgroundController - applies mutate/generate rules and re-checks existing
+#                          resources. Our policies only validate new ones.
+#   reportsController    - writes PolicyReport objects. Nice to browse, but it
+#                          is the memory-hungriest part and needs the
+#                          background scans we do not run.
+#   cleanupController    - runs CleanupPolicies (scheduled deletion). We have
+#                          none.
+#
+# Consequence to know: our policies therefore set `background: false`, and
+# there are no policy reports - a violation shows up as a rejected apply, not
+# as a report.
+kyverno:
+  admissionController:
+    replicas: 1
+
+  backgroundController:
+    enabled: false
+
+  reportsController:
+    enabled: false
+
+  cleanupController:
+    enabled: false

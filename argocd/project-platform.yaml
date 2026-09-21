@@ -7,20 +7,25 @@ metadata:
   name: platform
   namespace: argocd
 spec:
-  description: Shared platform components (observability)
+  description: Shared platform components (observability, policy)
   sourceRepos:
     - https://github.com/Luca-Guettinger/user_mgmt_gitops.git
     # The monitoring chart declares kube-prometheus-stack as a dependency.
     - https://prometheus-community.github.io/helm-charts
+    # The policy chart declares kyverno as a dependency.
+    - https://kyverno.github.io/kyverno/
   destinations:
     - server: https://kubernetes.default.svc
       namespace: monitoring
+    - server: https://kubernetes.default.svc
+      namespace: policy
   namespaceResourceWhitelist:
     - group: '*'
       kind: '*'
-  # Cluster-scoped resources kube-prometheus-stack genuinely needs: the target
-  # namespace, the Prometheus Operator CRDs, and the RBAC that lets Prometheus
-  # and kube-state-metrics read the whole cluster.
+  # Cluster-scoped resources these charts genuinely need: the target
+  # namespace, the Prometheus Operator and Kyverno CRDs, the RBAC that lets
+  # Prometheus and kube-state-metrics read the whole cluster, and the
+  # ClusterPolicies themselves.
   clusterResourceWhitelist:
     - group: ''
       kind: Namespace
@@ -30,3 +35,5 @@ spec:
       kind: ClusterRole
     - group: rbac.authorization.k8s.io
       kind: ClusterRoleBinding
+    - group: kyverno.io
+      kind: ClusterPolicy
