@@ -63,6 +63,29 @@ frontend:
     # this changes.
     NEXT_PUBLIC_API_URL: https://tf.nightnode.io/backend
 
+moduleService:
+  enabled: false
+  database:
+    secretName: module-service-db
+  # Vertical scaling (Aufgabe 6): one replica, sized so it stays stable
+  # under load. That is why this component has no HPA and no PDB.
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+  # Same reason as the backend: the mon node looks empty on paper and is not.
+  affinity:
+    nodeAffinity:
+      requiredDuringSchedulingIgnoredDuringExecution:
+        nodeSelectorTerms:
+          - matchExpressions:
+              - key: workload
+                operator: NotIn
+                values: [monitoring]
+
 # The database is the managed Postgres from terraform/database.tf. The Secret
 # is created by hand from `terraform output` (../../SECRETS-RUNBOOK.md).
 externalDatabase:

@@ -23,7 +23,7 @@ variable "node_size" {
 }
 
 variable "db_size" {
-  description = "Smallest managed Postgres: 1 vCPU, 1 GB RAM, ~15 USD/month."
+  description = "Size of both managed databases (Postgres and MySQL): 1 vCPU, 1 GB RAM, ~15 USD/month each."
   type        = string
   default     = "db-s-1vcpu-1gb"
 }

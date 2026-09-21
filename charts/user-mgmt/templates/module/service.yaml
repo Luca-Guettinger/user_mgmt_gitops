@@ -1,0 +1,20 @@
+{{- if .Values.moduleService.enabled }}
+{{- $ctx := dict "root" . "component" "module-service" }}
+# ClusterIP only. The module service is never exposed through the ingress:
+# the browser talks to the backend, and only the backend talks to this.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  type: {{ .Values.moduleService.service.type }}
+  selector:
+    {{- include "user-mgmt.selectorLabels" $ctx | nindent 4 }}
+  ports:
+    - name: http
+      port: {{ .Values.moduleService.service.port }}
+      targetPort: http
+{{- end }}

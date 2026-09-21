@@ -12,6 +12,9 @@ data:
   # Built from the postgres values so it always points at the Postgres Service.
   SPRING_DATASOURCE_URL: {{ include "user-mgmt.datasourceUrl" . | quote }}
   {{- end }}
+  # Where the module service answers. Derived from its Service name, so a
+  # rename happens in one place and the backend can only reach it in-cluster.
+  MODULE_SERVICE_URL: {{ printf "http://%s:%v" (include "user-mgmt.componentFqdn" (dict "root" . "component" "module-service")) .Values.moduleService.service.port | quote }}
   {{- range $key, $value := .Values.backend.config }}
   {{ $key }}: {{ $value | quote }}
   {{- end }}

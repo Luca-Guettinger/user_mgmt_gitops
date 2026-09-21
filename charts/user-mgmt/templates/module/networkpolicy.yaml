@@ -1,0 +1,57 @@
+{{- if and .Values.moduleService.enabled .Values.networkPolicy.enabled }}
+{{- $ctx := dict "root" . "component" "namespace" }}
+{{- $ns := include "user-mgmt.namespace" . }}
+{{- $backend := dict "root" . "component" "backend" }}
+{{- $module := dict "root" . "component" "module-service" }}
+# The namespace denies every inbound connection by default (see
+# namespace/networkpolicy.yaml), so the module service needs its own two
+# allow rules. They also say who may talk to it: the backend, and nobody
+# else in the namespace - not the portal, not the k6 job.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}-allow-backend-to-module-service
+  namespace: {{ $ns }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $module | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels:
+              {{- include "user-mgmt.selectorLabels" $backend | nindent 14 }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.moduleService.containerPort }}
+{{- if .Values.networkPolicy.monitoringNamespace }}
+---
+# Prometheus scrapes /metrics. Without this the default-deny drops the
+# scrape and the target shows up as down.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "user-mgmt.fullname" . }}-allow-monitoring-to-module-service
+  namespace: {{ $ns }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $module | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ .Values.networkPolicy.monitoringNamespace }}
+      ports:
+        - protocol: TCP
+          port: {{ .Values.moduleService.containerPort }}
+{{- end }}
+{{- end }}

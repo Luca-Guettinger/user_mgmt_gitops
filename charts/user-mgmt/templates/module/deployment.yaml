@@ -1,0 +1,62 @@
+{{- if .Values.moduleService.enabled }}
+{{- $ctx := dict "root" . "component" "module-service" }}
+# One replica, on purpose. Aufgabe 6 asks for vertical scaling: the pod is
+# sized so it stays stable under load instead of getting a second replica,
+# so there is no HPA and no PDB for this component.
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "user-mgmt.componentName" $ctx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $ctx | nindent 4 }}
+spec:
+  replicas: {{ .Values.moduleService.replicaCount }}
+  strategy:
+    {{- toYaml .Values.moduleService.strategy | nindent 4 }}
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $ctx | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "user-mgmt.labels" $ctx | nindent 8 }}
+      annotations:
+        # Roll the pods automatically when the config changes.
+        checksum/config: {{ include (print $.Template.BasePath "/module/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- with .Values.moduleService.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      containers:
+        - name: module-service
+          image: {{ include "user-mgmt.image" (dict "root" . "image" .Values.moduleService.image) }}
+          imagePullPolicy: {{ include "user-mgmt.imagePullPolicy" (dict "root" . "image" .Values.moduleService.image) }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.moduleService.containerPort }}
+          envFrom:
+            - configMapRef:
+                name: {{ include "user-mgmt.componentName" $ctx }}
+            {{- with .Values.moduleService.database.secretName }}
+            # DATABASE_URL of the managed MySQL, created by hand.
+            - secretRef:
+                name: {{ . }}
+            {{- end }}
+          {{- if .Values.moduleService.probes.readiness.enabled }}
+          # Gates Service endpoints. /health does not touch MySQL: a lost
+          # database must show up as 5xx and an alert, not as NotReady pods.
+          readinessProbe:
+            {{- include "user-mgmt.httpProbe" (dict "probe" .Values.moduleService.probes.readiness "port" "http") | nindent 12 }}
+          {{- end }}
+          {{- if .Values.moduleService.probes.liveness.enabled }}
+          # Restarts a pod that is running but wedged.
+          livenessProbe:
+            {{- include "user-mgmt.httpProbe" (dict "probe" .Values.moduleService.probes.liveness "port" "http") | nindent 12 }}
+          {{- end }}
+          {{- with .Values.moduleService.resources }}
+          resources:
+            {{- toYaml . | nindent 12 }}
+          {{- end }}
+{{- end }}

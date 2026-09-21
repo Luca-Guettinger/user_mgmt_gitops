@@ -163,6 +163,62 @@ frontend:
     enabled: false
     minAvailable: 1
 
+# --------------------------------------------------------------- module-service
+# The Python module service (Aufgabe 6). Off by default: it runs in
+# production only, so staging and dev need no override.
+moduleService:
+  enabled: false
+  replicaCount: 1
+  image:
+    repository: ghcr.io/luca-guettinger/module-service
+    tag: ""
+    pullPolicy: ""
+  containerPort: 8080
+  service:
+    type: ClusterIP
+    port: 8080
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 0
+  config:
+    # It reaches the managed MySQL over the private VPC address, where
+    # DigitalOcean does not require TLS.
+    MYSQL_SSL_DISABLED: "true"
+    LOG_LEVEL: INFO
+  # Name of a hand-made Secret holding DATABASE_URL.
+  database:
+    secretName: ""
+  resources:
+    requests:
+      cpu: 100m
+      memory: 192Mi
+    limits:
+      cpu: 500m
+      memory: 384Mi
+  probes:
+    # /health answers without touching MySQL - same reasoning as the
+    # backend's health groups: a lost database is an alert, not a restart.
+    readiness:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 5
+      periodSeconds: 10
+      timeoutSeconds: 3
+      failureThreshold: 3
+    liveness:
+      enabled: true
+      path: /health
+      initialDelaySeconds: 20
+      periodSeconds: 20
+      timeoutSeconds: 3
+      failureThreshold: 6
+  metrics:
+    # FastAPI serves the Prometheus text format here, not on an actuator path.
+    path: /metrics
+  affinity: {}
+
 # -------------------------------------------------------------------- postgres
 # A database outside the cluster, e.g. DO managed Postgres (Aufgabe 4).
 # Name of a hand-made Secret with SPRING_DATASOURCE_URL, _USERNAME and

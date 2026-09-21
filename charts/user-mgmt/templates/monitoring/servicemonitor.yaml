@@ -24,4 +24,29 @@ spec:
       path: {{ .Values.metrics.serviceMonitor.path }}
       interval: {{ .Values.metrics.serviceMonitor.interval }}
       scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+{{- if .Values.moduleService.enabled }}
+{{- $moduleCtx := dict "root" . "component" "module-service" }}
+---
+# The same for the module service. Its path differs: FastAPI serves the
+# Prometheus text format on /metrics, not on an actuator endpoint.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "user-mgmt.componentName" $moduleCtx }}
+  namespace: {{ include "user-mgmt.namespace" . }}
+  labels:
+    {{- include "user-mgmt.labels" $moduleCtx | nindent 4 }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "user-mgmt.selectorLabels" $moduleCtx | nindent 6 }}
+  namespaceSelector:
+    matchNames:
+      - {{ include "user-mgmt.namespace" . }}
+  endpoints:
+    - port: http
+      path: {{ .Values.moduleService.metrics.path }}
+      interval: {{ .Values.metrics.serviceMonitor.interval }}
+      scrapeTimeout: {{ .Values.metrics.serviceMonitor.scrapeTimeout }}
+{{- end }}
 {{- end }}
