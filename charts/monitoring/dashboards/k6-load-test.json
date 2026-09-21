@@ -68,8 +68,8 @@
         "includeAll": false,
         "multi": false,
         "current": {
-          "text": "user-mgmt-staging",
-          "value": "user-mgmt-staging"
+          "text": "user-mgmt",
+          "value": "user-mgmt"
         },
         "options": [],
         "hide": 0
