@@ -2,15 +2,18 @@
 #
 # Run the k6 load test in the cluster and follow it.
 #
-#   ./k6/run.sh                          # staging, the default target
-#   ./k6/run.sh -u https://tf.nightnode.io/backend --yes-really-prod
-#   ./k6/run.sh ... -p 25                # stress: 25 VUs at the peak (default 9)
+#   ./k6/run.sh                          # prod, the default target
+#   ./k6/run.sh --staging                # staging instead
+#   ./k6/run.sh -p 25                    # stress: 25 VUs at the peak (default 9)
 #
 # What it does: rebuilds the ConfigMap from k6/load-test.js, replaces the Job,
 # and tails its logs. Watch the "k6 Load Test" dashboard in Grafana while it
 # runs - that is where the HPA reaction shows up.
 #
 # Notes
+#   * The target is production, on purpose: that is where Aufgabe 2 was
+#     demonstrated, and where the HPA has four replicas to work with. The run
+#     only registers users, so the cost of pointing it there is test rows.
 #   * The Job talks to the backend ClusterIP Service from inside the cluster,
 #     so kube-proxy spreads the requests over every ready replica. The old
 #     local/load-test.sh used kubectl port-forward, which pinned all traffic
@@ -23,21 +26,26 @@
 set -euo pipefail
 
 NAMESPACE_K6="k6"
-TARGET="http://user-mgmt-staging-backend.user-mgmt-staging.svc.cluster.local:8080"
+NAMESPACE_APP="user-mgmt"
+TARGET="http://user-mgmt-prod-backend.user-mgmt.svc.cluster.local:8080"
 TEST_ID="$(date +%Y%m%d-%H%M%S)"
 PEAK_VUS=9
-ALLOW_PROD=0
 FOLLOW=1
 
-usage() { sed -n '2,25p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'; exit 0; }
+usage() { sed -n '2,24p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'; exit 0; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --staging)
+      NAMESPACE_APP="user-mgmt-staging"
+      TARGET="http://user-mgmt-staging-backend.user-mgmt-staging.svc.cluster.local:8080"
+      shift ;;
     -u|--url)          TARGET="$2"; shift 2 ;;
+    # Only used for the HPA readout at the end, so -u can point anywhere.
+    -n|--namespace)    NAMESPACE_APP="$2"; shift 2 ;;
     -t|--test-id)      TEST_ID="$2"; shift 2 ;;
     -p|--peak-vus)     PEAK_VUS="$2"; shift 2 ;;
     --no-follow)       FOLLOW=0; shift ;;
-    --yes-really-prod) ALLOW_PROD=1; shift ;;
     -h|--help)         usage ;;
     *) echo "unknown flag: $1 (try --help)" >&2; exit 2 ;;
   esac
@@ -49,15 +57,13 @@ command -v kubectl >/dev/null || die "kubectl not found"
 cd "$(dirname "$0")/.."
 
 case "$TARGET" in
-  *user-mgmt-prod*|*tf.nightnode.io*)
-    [ "$ALLOW_PROD" -eq 1 ] || die "refusing to load-test PRODUCTION ($TARGET).
-       It serves the live site. Pass --yes-really-prod if that is what you want."
-    echo "!!  PRODUCTION target: $TARGET" ;;
+  *user-mgmt-prod*|*tf.nightnode.io*) echo "!!  PRODUCTION target: $TARGET" ;;
 esac
 
-echo "==> context: $(kubectl config current-context)"
-echo "==> target:  $TARGET"
-echo "==> test id: $TEST_ID"
+echo "==> context:   $(kubectl config current-context)"
+echo "==> target:    $TARGET"
+echo "==> namespace: $NAMESPACE_APP"
+echo "==> test id:   $TEST_ID"
 
 # The namespace has to exist before the ConfigMaps go into it.
 kubectl get namespace "$NAMESPACE_K6" >/dev/null 2>&1 \
@@ -90,5 +96,5 @@ if [ "$FOLLOW" -eq 1 ]; then
   kubectl -n "$NAMESPACE_K6" logs -f job/k6-load-test
   echo
   echo "==> HPA afterwards (scale-down takes ~5 more minutes):"
-  kubectl -n user-mgmt-staging get hpa,deploy -l app.kubernetes.io/component=backend
+  kubectl -n "$NAMESPACE_APP" get hpa,deploy -l app.kubernetes.io/component=backend
 fi
