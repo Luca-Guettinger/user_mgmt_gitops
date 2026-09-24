@@ -202,7 +202,7 @@
             "type": "prometheus",
             "uid": "${DS}"
           },
-          "expr": "sum(rate(http_requests_total{namespace=\"$namespace\", job=~\"$job\", status=\"5xx\"}[5m])) / sum(rate(http_requests_total{namespace=\"$namespace\", job=~\"$job\"}[5m]))",
+          "expr": "(sum(rate(http_requests_total{namespace=\"$namespace\", job=~\"$job\", status=\"5xx\"}[5m])) or vector(0)) / sum(rate(http_requests_total{namespace=\"$namespace\", job=~\"$job\"}[5m]))",
           "legendFormat": "5xx share",
           "refId": "A",
           "editorMode": "code",
