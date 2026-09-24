@@ -4,9 +4,10 @@
 #
 #   ./k6/run.sh                          # prod, the default target
 #   ./k6/run.sh --staging                # staging instead
+#   ./k6/run.sh -s assign-test.js        # load the module assignment path instead
 #   ./k6/run.sh -p 25                    # stress: 25 VUs at the peak (default 9)
 #
-# What it does: rebuilds the ConfigMap from k6/load-test.js, replaces the Job,
+# What it does: rebuilds the ConfigMap from the chosen script, replaces the Job,
 # and tails its logs. Watch the "k6 Load Test" dashboard in Grafana while it
 # runs - that is where the HPA reaction shows up.
 #
@@ -20,19 +21,23 @@
 #     to one pod.
 #   * The run takes 10 minutes by design: hpa.yaml waits 60s of sustained load
 #     before scaling up and 300s of quiet before scaling back down.
-#   * Each VU registers one user and then loops on GET /users/me. Clean up
-#     afterwards with the DELETE in the runbook if the rows get in the way.
+#   * load-test.js registers one user per iteration, so the rows add up - clean
+#     up with the DELETE in the runbook. assign-test.js creates one user in
+#     setup() and then only assigns, so it adds nothing.
+#   * -s only changes which file is read. The ConfigMap key stays load-test.js,
+#     because that is the path k6-job.yaml runs.
 
 set -euo pipefail
 
 NAMESPACE_K6="k6"
 NAMESPACE_APP="user-mgmt"
 TARGET="http://user-mgmt-prod-backend.user-mgmt.svc.cluster.local:8080"
+SCRIPT="load-test.js"
 TEST_ID="$(date +%Y%m%d-%H%M%S)"
 PEAK_VUS=9
 FOLLOW=1
 
-usage() { sed -n '2,24p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'; exit 0; }
+usage() { sed -n '2,28p' "$0" | sed 's/^#\{1,2\} \{0,1\}//'; exit 0; }
 
 while [ $# -gt 0 ]; do
   case "$1" in
@@ -43,6 +48,7 @@ while [ $# -gt 0 ]; do
     -u|--url)          TARGET="$2"; shift 2 ;;
     # Only used for the HPA readout at the end, so -u can point anywhere.
     -n|--namespace)    NAMESPACE_APP="$2"; shift 2 ;;
+    -s|--script)       SCRIPT="$2"; shift 2 ;;
     -t|--test-id)      TEST_ID="$2"; shift 2 ;;
     -p|--peak-vus)     PEAK_VUS="$2"; shift 2 ;;
     --no-follow)       FOLLOW=0; shift ;;
@@ -72,7 +78,7 @@ kubectl get namespace "$NAMESPACE_K6" >/dev/null 2>&1 \
 # The script is a real file, so it stays readable and lintable; the ConfigMap
 # is generated from it rather than the other way round.
 kubectl -n "$NAMESPACE_K6" create configmap k6-script \
-  --from-file=load-test.js=k6/load-test.js \
+  --from-file=load-test.js=k6/"$SCRIPT" \
   --dry-run=client -o yaml | kubectl apply -f -
 
 # Per-run settings. They live here rather than in k6-job.yaml because a Job's
